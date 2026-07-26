@@ -1,0 +1,27 @@
+{# Reused by Search and Ask to keep result formatting consistent. #}
+{% if hits %}
+  <div class="hits-list">
+    {% for hit in hits %}
+      <article class="hit-card">
+        <header>
+          <span class="result-index">#{{ loop.index }}</span>
+          <div class="score">
+            {# The visual bar is capped at 100%, while the exact score stays visible. #}
+            <div class="score-track">
+              <span style="width: {{ ([hit.score * 100, 100] | min) | round }}%"></span>
+            </div>
+            <strong>{{ "%.4f" | format(hit.score) }}</strong>
+          </div>
+        </header>
+        <p>{{ hit.text }}</p>
+        <footer>
+          {% if hit.source %}<span>Source: {{ hit.source }}</span>{% endif %}
+          {% if hit.strategy %}<span>Strategy: {{ hit.strategy }}</span>{% endif %}
+          <span>ID: {{ hit.id[:8] }}…</span>
+        </footer>
+      </article>
+    {% endfor %}
+  </div>
+{% else %}
+  <div class="empty-state">No relevant chunks were found.</div>
+{% endif %}

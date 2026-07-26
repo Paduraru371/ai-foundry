@@ -1,0 +1,16 @@
+# web applications
+fastapi>=0.115,<1.0
+uvicorn[standard]>=0.30
+httpx>=0.27
+pydantic-settings>=2.4
+
+# RAG backend and model providers
+qdrant-client>=1.12
+openai>=1.50
+anthropic>=0.40
+azure-ai-inference>=1.0.0b9
+azure-identity>=1.17
+
+# server-rendered admin console
+jinja2>=3.1
+python-multipart>=0.0.20

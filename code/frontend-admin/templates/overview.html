@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}Overview{% endblock %}
+{% block content %}
+  <header class="page-heading">
+    <div>
+      <span class="eyebrow">Operations center</span>
+      <h1>Service status</h1>
+      <p>Review every database and model supported by Libra Assist.</p>
+    </div>
+    <a class="button secondary" href="/">↻ Refresh</a>
+  </header>
+
+  {% for title, services in [
+    ('Databases', catalog.databases),
+    ('Language models', catalog.llms),
+    ('Embedding models', catalog.embeddings)
+  ] %}
+    <section class="service-section" aria-labelledby="section-{{ loop.index }}">
+      <header class="section-heading">
+        <h2 id="section-{{ loop.index }}">{{ title }}</h2>
+        <span>{{ services | length }} service{{ '' if services | length == 1 else 's' }}</span>
+      </header>
+      <div class="status-grid">
+        {% for service in services %}
+          <article class="status-card status-card--{{ service.tone }}">
+            <span class="card-icon {{ 'green' if service.category == 'database' else ('violet' if service.category == 'llm' else 'blue') }}">
+              {{ service.icon }}
+            </span>
+            <span class="card-label">{{ service.category | replace('llm', 'answer generation') | title }}</span>
+            <strong>{{ service.provider }}</strong>
+            <span class="model-name">{{ service.model }}</span>
+            <span class="status-pill {{ service.tone }}">{{ service.status }}</span>
+            <small>{{ service.detail }}</small>
+          </article>
+        {% endfor %}
+      </div>
+    </section>
+  {% endfor %}
+{% endblock %}

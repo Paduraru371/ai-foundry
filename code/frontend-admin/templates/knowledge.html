@@ -1,0 +1,102 @@
+{% extends "base.html" %}
+{% block title %}Knowledge Base{% endblock %}
+{% block content %}
+  <header class="page-heading">
+    <div>
+      <span class="eyebrow">Data preparation</span>
+      <h1>Knowledge base</h1>
+      <p>Split documents into chunks, review the result, and store it in Qdrant.</p>
+    </div>
+  </header>
+
+  {% if request.query_params.get('reset') == 'success' %}
+    <div class="success-notice">The collection was reset successfully.</div>
+  {% endif %}
+
+  {# Collection metadata is refreshed whenever this page is rendered. #}
+  <section class="collection-strip" aria-label="Collection information">
+    <span class="collection-icon">DB</span>
+    <div><span>Collection</span><strong>{{ collection.name if collection else '—' }}</strong></div>
+    <div><span>Chunks</span><strong>{{ collection.points_count if collection else '—' }}</strong></div>
+    <div><span>Vector dimension</span><strong>{{ collection.vector_dimension or '—' if collection else '—' }}</strong></div>
+    <div><span>Distance</span><strong>{{ collection.distance or '—' if collection else '—' }}</strong></div>
+    <a class="button danger" href="/collection/reset">↻ Reset</a>
+  </section>
+
+  <section class="panel">
+    <header class="panel-header">
+      <div><span class="eyebrow">POST /chunk &amp; /ingest</span><h2>New document</h2></div>
+    </header>
+    <form method="post">
+      <label>
+        Document content
+        <textarea name="text" rows="9" required
+          placeholder="Paste a document about Libra Bank products or procedures…">{{ values.text }}</textarea>
+        <span class="field-hint">The text remains in the form after processing or an error.</span>
+      </label>
+
+      <div class="form-grid">
+        <label>
+          Chunking strategy
+          <select name="strategy">
+            {% for option, label in [
+              ('static', 'Static'), ('sentence', 'Sentence'),
+              ('dynamic', 'Dynamic'), ('semantic', 'Semantic')
+            ] %}
+              <option value="{{ option }}" {{ 'selected' if values.strategy == option else '' }}>{{ label }}</option>
+            {% endfor %}
+          </select>
+        </label>
+        <label>
+          Target size
+          <input name="chunk_size" type="number" min="50" value="{{ values.chunk_size }}" required>
+        </label>
+        <label>
+          Overlap
+          <input name="chunk_overlap" type="number" min="0" value="{{ values.chunk_overlap }}" required>
+        </label>
+        <label>
+          Source label
+          <input name="source" value="{{ values.source }}" placeholder="ex. faq-carduri">
+        </label>
+      </div>
+      <div class="form-actions">
+        {# formaction lets one form submit to two different FastAPI routes. #}
+        <button class="button secondary" formaction="/knowledge/chunk">✂ Preview chunks</button>
+        <button class="button primary" formaction="/knowledge/ingest">↑ Chunk and store</button>
+      </div>
+    </form>
+  </section>
+
+  {% if result %}
+    <section class="panel">
+      <header class="panel-header">
+        <div><span class="eyebrow">Result</span><h2>{{ result.count }} chunks generated</h2></div>
+        <span class="status-pill ok">{{ 'Stored' if result_type == 'ingest' else 'Preview only' }}</span>
+      </header>
+
+      {% if result_type == 'ingest' %}
+        {# Embedding details are only returned by /ingest, not by /chunk. #}
+        <div class="metric-row">
+          <div><span>Vectors stored</span><strong>{{ result.count }}</strong></div>
+          <div><span>Dimension</span><strong>{{ result.vector_dimension }}</strong></div>
+          <div class="wide"><span>Preview embedding</span><code>[{{ result.embedding_preview | join(', ') }}]</code></div>
+        </div>
+      {% endif %}
+
+      <div class="chunks-list">
+        {% for chunk in result.chunks %}
+          <article class="chunk-card">
+            <header>
+              <strong>Chunk {{ chunk.index + 1 }}</strong>
+              <small>{{ chunk.chars }} characters · ~{{ chunk.approx_tokens }} tokens</small>
+            </header>
+            <p>{{ chunk.text }}</p>
+          </article>
+        {% endfor %}
+      </div>
+    </section>
+  {% else %}
+    <div class="empty-state">Generated chunks will appear here for review.</div>
+  {% endif %}
+{% endblock %}

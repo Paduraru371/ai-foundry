@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block title %}Search{% endblock %}
+{% block content %}
+  <header class="page-heading">
+    <div>
+      <span class="eyebrow">Retrieval</span>
+      <h1>Search the collection</h1>
+      <p>Test semantic retrieval and compare cosine similarity scores.</p>
+    </div>
+  </header>
+
+  <section class="panel">
+    <header class="panel-header">
+      <div><span class="eyebrow">POST /search</span><h2>Semantic query</h2></div>
+    </header>
+    <form class="search-form" method="post" action="/search">
+      <label class="grow">
+        Search query
+        <input name="query" value="{{ query }}" placeholder="e.g. How can I unblock my card?" required>
+      </label>
+      <label class="compact-field">
+        Results
+        <input name="top_k" type="number" min="1" max="50" value="{{ top_k }}" required>
+      </label>
+      <button class="button primary">⌕ Search</button>
+    </form>
+  </section>
+
+  {% if result %}
+    {# Hits are sorted by score in the route before this template is rendered. #}
+    <section class="panel">
+      <header class="panel-header">
+        <div><span class="eyebrow">Ranked results</span><h2>{{ result.hits | length }} chunks found</h2></div>
+      </header>
+      <p class="vector-preview"><strong>Query vector preview:</strong> [{{ result.query_embedding_preview | join(', ') }}]</p>
+      {% with hits=result.hits %}{% include "_hits.html" %}{% endwith %}
+    </section>
+  {% else %}
+    <div class="empty-state">Search results and similarity scores will appear here.</div>
+  {% endif %}
+{% endblock %}

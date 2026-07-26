@@ -126,16 +126,30 @@ def chunk(
     embed_fn: EmbedFn | None = None,
 ) -> list[str]:
     text = text.strip()
+    
     if not text:
         return []
-    if strategy == "static":
-        return chunk_static(text, size, overlap)
-    if strategy == "sentence":
-        return chunk_sentence(text, per_chunk)
-    if strategy == "dynamic":
-        return chunk_dynamic(text, size, overlap)
-    if strategy == "semantic":
-        if embed_fn is None:
-            raise ValueError("semantic chunking requires an embedding function")
-        return chunk_semantic(text, threshold, embed_fn)
-    raise ValueError(f"unknown strategy '{strategy}' — expected one of {STRATEGIES}")
+
+    match strategy:
+        case "static":
+            return chunk_static(text, size, overlap)
+
+        case "sentence":
+            return chunk_sentence(text, per_chunk)
+
+        case "dynamic":
+            return chunk_dynamic(text, size, overlap)
+
+        case "semantic":
+            if embed_fn is None:
+                raise ValueError(
+                    "Semantic chunking requires an embedding function."
+                )
+            return chunk_semantic(text, threshold, embed_fn)
+
+        case _:
+            available = ", ".join(sorted(STRATEGIES))
+            raise ValueError(
+                f"Unknown strategy '{strategy}'. "
+                f"Expected one of: {available}."
+            )

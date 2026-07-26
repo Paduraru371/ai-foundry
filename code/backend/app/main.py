@@ -91,8 +91,10 @@ def _require_qdrant() -> None:
     if not store.ping():
         raise HTTPException(
             status_code=503,
-            detail=f"Qdrant is not reachable at {settings.qdrant_url} — "
-                   f"start it with: docker compose up qdrant -d",
+            detail= f"Qdrant is not reachable at {settings.qdrant_url} — "
+                    # f"start it with: docker compose up qdrant -d",
+                    "start the Docker services with the platform-specific "
+                    "start-backend script",
         )
 
 

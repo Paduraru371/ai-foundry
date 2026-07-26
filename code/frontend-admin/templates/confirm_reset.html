@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block title %}Confirmare resetare{% endblock %}
+{% block content %}
+  <div class="confirm-card">
+    <span class="warning-mark">!</span>
+    <span class="eyebrow">Destructive action</span>
+    <h1>Reset the collection?</h1>
+    <p>
+      All chunks and embeddings stored in Qdrant will be deleted.
+      This action cannot be undone.
+    </p>
+    {# Confirmation uses a POST request; opening this page cannot delete data. #}
+    <div class="form-actions centered">
+      <a class="button secondary" href="/knowledge">Cancel</a>
+      <form method="post" action="/collection/reset">
+        <button class="button danger">Yes, delete collection</button>
+      </form>
+    </div>
+  </div>
+{% endblock %}

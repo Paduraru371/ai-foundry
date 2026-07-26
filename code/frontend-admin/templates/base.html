@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Libra Assist administration console">
+  <title>{% block title %}Libra Assist{% endblock %} · Admin</title>
+  <link rel="stylesheet" href="{{ url_for('static', path='/styles.css') }}">
+</head>
+<body>
+  <div class="app-shell">
+    {# Shared navigation; active_page is supplied by each FastAPI route. #}
+    <aside class="sidebar">
+      <a class="brand" href="/">
+        <span class="brand-mark" aria-hidden="true">L</span>
+        <span><strong>Libra Assist</strong><small>Admin console</small></span>
+      </a>
+
+      <nav aria-label="Main navigation">
+        <a class="nav-item {{ 'active' if active_page == 'overview' else '' }}" href="/">
+          <span aria-hidden="true">◫</span> Overview
+        </a>
+        <a class="nav-item {{ 'active' if active_page == 'knowledge' else '' }}" href="/knowledge">
+          <span aria-hidden="true">▤</span> Knowledge base
+        </a>
+        <a class="nav-item {{ 'active' if active_page == 'search' else '' }}" href="/search">
+          <span aria-hidden="true">⌕</span> Search
+        </a>
+        <a class="nav-item {{ 'active' if active_page == 'ask' else '' }}" href="/ask">
+          <span aria-hidden="true">✦</span> Test answer
+        </a>
+      </nav>
+
+      <div class="connection">
+        <span class="connection-dot {{ 'online' if backend_online else '' }}"></span>
+        <span>
+          <strong>{{ 'API connected' if backend_online else 'API disconnected' }}</strong>
+          <small>localhost:7799</small>
+        </span>
+      </div>
+    </aside>
+
+    <main class="main-content">
+      {# Backend errors are displayed consistently on every page. #}
+      {% if error %}
+        <div class="error-notice" role="alert">
+          <span class="error-icon">!</span>
+          <div>
+            <strong>
+              {% if error_status %}API error · {{ error_status }}{% else %}Connection failed{% endif %}
+            </strong>
+            <p>{{ error }}</p>
+          </div>
+        </div>
+      {% endif %}
+      {% block content %}{% endblock %}
+    </main>
+  </div>
+</body>
+</html>
