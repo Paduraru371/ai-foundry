@@ -5,8 +5,6 @@ SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd -- "$SCRIPT_DIR/../.." && pwd)"
 VENV_DIR="$PROJECT_ROOT/.venv"
 VENV_PYTHON="$VENV_DIR/bin/python"
-ROOT_ENV="$PROJECT_ROOT/.env"
-ENV_EXAMPLE="$PROJECT_ROOT/.env.example"
 SECRET_FILE="$PROJECT_ROOT/.credentials"
 PYTHON_BIN="${PYTHON_BIN:-python3}"
 
@@ -50,22 +48,6 @@ else
   chmod 600 "$SECRET_FILE"
   echo "Created .credentials for Azure credentials."
 fi
-
-if [[ ! -f "$ENV_EXAMPLE" ]]; then
-  echo "Error: .env.example is missing."
-  exit 1
-fi
-
-#####
-# Regular settings stay readable; only Azure values become secret macros.
-cp "$ENV_EXAMPLE" "$ROOT_ENV"
-sed -i \
-  -e 's|^AZURE_AI_ENDPOINT=.*|AZURE_AI_ENDPOINT=${SECRET_AZURE_AI_ENDPOINT}|' \
-  -e 's|^AZURE_AI_AUTH=.*|AZURE_AI_AUTH=${SECRET_AZURE_AI_AUTH}|' \
-  -e 's|^AZURE_AI_API_KEY=.*|AZURE_AI_API_KEY=${SECRET_AZURE_AI_API_KEY}|' \
-  -e 's|^AZURE_AI_CHAT_DEPLOYMENT=.*|AZURE_AI_CHAT_DEPLOYMENT=${SECRET_AZURE_AI_CHAT_DEPLOYMENT}|' \
-  -e 's|^AZURE_AI_EMBEDDING_DEPLOYMENT=.*|AZURE_AI_EMBEDDING_DEPLOYMENT=${SECRET_AZURE_AI_EMBEDDING_DEPLOYMENT}|' \
-  "$ROOT_ENV"
 
 echo
 echo "Setup complete."

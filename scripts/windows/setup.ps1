@@ -3,8 +3,6 @@ $ErrorActionPreference = "Stop"
 $ProjectRoot = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
 $VenvDir = Join-Path $ProjectRoot ".venv"
 $VenvPython = Join-Path $VenvDir "Scripts\python.exe"
-$RootEnv = Join-Path $ProjectRoot ".env"
-$EnvExample = Join-Path $ProjectRoot ".env.example"
 $Credentials = Join-Path $ProjectRoot ".credentials"
 
 if (Get-Command py -ErrorAction SilentlyContinue) {
@@ -64,19 +62,6 @@ if (-not (Test-Path $Credentials)) {
 else {
     Write-Host "Keeping existing Azure credentials: $Credentials"
 }
-
-if (-not (Test-Path $EnvExample)) {
-    throw ".env.example is missing."
-}
-
-# Copy regular settings and replace only Azure values with secret macros.
-$EnvContent = [System.IO.File]::ReadAllText($EnvExample)
-$EnvContent = $EnvContent -replace '(?m)^AZURE_AI_ENDPOINT=.*$', 'AZURE_AI_ENDPOINT=$${SECRET_AZURE_AI_ENDPOINT}'
-$EnvContent = $EnvContent -replace '(?m)^AZURE_AI_AUTH=.*$', 'AZURE_AI_AUTH=$${SECRET_AZURE_AI_AUTH}'
-$EnvContent = $EnvContent -replace '(?m)^AZURE_AI_API_KEY=.*$', 'AZURE_AI_API_KEY=$${SECRET_AZURE_AI_API_KEY}'
-$EnvContent = $EnvContent -replace '(?m)^AZURE_AI_CHAT_DEPLOYMENT=.*$', 'AZURE_AI_CHAT_DEPLOYMENT=$${SECRET_AZURE_AI_CHAT_DEPLOYMENT}'
-$EnvContent = $EnvContent -replace '(?m)^AZURE_AI_EMBEDDING_DEPLOYMENT=.*$', 'AZURE_AI_EMBEDDING_DEPLOYMENT=$${SECRET_AZURE_AI_EMBEDDING_DEPLOYMENT}'
-[System.IO.File]::WriteAllText($RootEnv, $EnvContent, $Utf8NoBom)
 
 Write-Host ""
 Write-Host "Setup complete."

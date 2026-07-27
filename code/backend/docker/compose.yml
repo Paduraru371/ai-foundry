@@ -13,9 +13,9 @@ services:
       - qdrant-data:/qdrant/storage
 
   api:
-    build: .
-    # context: ../../..
-    # dockerfile: code/backend/docker/backend.Dockerfile
+    build:
+      context: ../../..
+      dockerfile: code/backend/docker/backend.Dockerfile
     container_name: rag-api
 
     ports:
