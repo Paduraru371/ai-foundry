@@ -2,7 +2,8 @@
 fastapi>=0.115,<1.0
 uvicorn[standard]>=0.30
 httpx>=0.27
-pydantic-settings>=2.4
+jinja2>=3.1
+python-multipart>=0.0.20
 
 # RAG backend and model providers
 qdrant-client>=1.12
