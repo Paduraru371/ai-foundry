@@ -53,7 +53,7 @@ if (-not (Test-Path $Credentials)) {
         "SECRET_AZURE_AI_ENDPOINT=",
         "SECRET_AZURE_AI_AUTH=key",
         "SECRET_AZURE_AI_API_KEY=",
-        "SECRET_AZURE_AI_CHAT_DEPLOYMENT=gpt-5.1",
+        "SECRET_AZURE_AI_CHAT_DEPLOYMENT=gpt-5-mini",
         "SECRET_AZURE_AI_EMBEDDING_DEPLOYMENT=text-embedding-3-small"
     )
     [System.IO.File]::WriteAllLines($Credentials, $CredentialLines, $Utf8NoBom)
