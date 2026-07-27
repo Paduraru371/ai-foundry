@@ -1,0 +1,49 @@
+services:
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: rag-qdrant
+    ports:
+      - "7833:6333"   # HTTP + web dashboard  → http://localhost:7833/dashboard
+      - "7834:6334"   # gRPC
+    volumes:
+      - qdrant-data:/qdrant/storage
+
+  api:
+    build: .
+    container_name: rag-api
+    ports:
+      - "7799:7799"
+    env_file: .env
+    environment:
+      # inside the compose network the DB is a hostname, not a mapped port
+      QDRANT_URL: http://qdrant:6333
+      # a container cannot see your `az login`, so the Azure lane uses the key here.
+      # Locally (uv run uvicorn) the same .env keeps AZURE_AI_AUTH=identity — one
+      # codebase, both authentication lanes, decided by where it runs.
+      AZURE_AI_AUTH: key
+      # uncomment to reach LM Studio running on the HOST from inside the container:
+      # LMSTUDIO_BASE_URL: http://host.docker.internal:1234/v1
+    volumes:
+      - ./app:/srv/app          # live reload: edit locally, uvicorn restarts in-container
+    depends_on:
+      - qdrant
+    extra_hosts:
+      - "host.docker.internal:host-gateway"   # makes host LM Studio reachable on Linux too
+
+  console:
+    build: ../frontend
+    container_name: rag-console
+    ports:
+      - "7800:7800"
+    environment:
+      # inside the compose network the API is a hostname, not localhost
+      VITE_API_TARGET: http://api:7799
+    volumes:
+      - ../frontend/src:/srv/src              # live reload: edit locally, HMR in the browser
+      - ../frontend/index.html:/srv/index.html
+      - ../frontend/vite.config.js:/srv/vite.config.js   # proxy routes, without a rebuild
+    depends_on:
+      - api
+
+volumes:
+  qdrant-data:

@@ -17,23 +17,62 @@ text ─► POST /chunk ─► POST /ingest ─► Qdrant ─► POST /search �
 - **Postman:** import `postman/rag-teaching-api.postman_collection.json`
 - **Deps:** managed with [uv](https://docs.astral.sh/uv/) (`pyproject.toml` + `uv.lock`)
 
+<<<<<<< HEAD
 ## Run it — option A: everything local
+=======
+## Run it — option A: locally, without Docker (recommended for teaching)
+
+Only the vector database runs in a container; the API runs on your machine, where it can
+borrow your `az login`. **This is the mode where hosted Foundry agents and the model
+deployments are visible**, because the Agent Service and the control plane both require
+Microsoft Entra authentication.
+>>>>>>> main
 
 ```bash
 cd code/backend
 cp .env.example .env               # then edit — see Credentials below
+<<<<<<< HEAD
 docker compose up qdrant -d        # just the DB
 uv sync                            # create .venv from uv.lock
 uv run uvicorn app.main:app --reload --port 7799
 ```
 
+=======
+docker compose up qdrant -d        # just the vector DB
+uv sync                            # create .venv from uv.lock
+az login                           # what makes AZURE_AI_AUTH=identity work
+uv run uvicorn app.main:app --reload --port 7799
+```
+
+Add the console in a second terminal:
+
+```bash
+cd code/frontend
+npm install                        # first time only
+npm run dev                        # http://localhost:7800, proxies to :7799
+```
+
+Skipping Qdrant entirely is fine for a quick look — `/chunk`, `/agents`, `/tools` and
+ungrounded `/ask` all work without it; only `/ingest`, `/search` and grounded `/ask` need it.
+
+>>>>>>> main
 ## Run it — option B: everything in Docker
 
 ```bash
 cd code/backend
 docker compose up --build
+<<<<<<< HEAD
 ```
 
+=======
+#   :7800 console · :7799/docs Swagger · :7833/dashboard Qdrant
+```
+
+Self-contained and one command, but the API container authenticates with a **key** (a
+container cannot see your `az login`), so the Agent Service and the control plane are
+unavailable there. The console reports that honestly rather than showing an empty list.
+
+>>>>>>> main
 The app container overrides `QDRANT_URL` automatically and bind-mounts `./app`,
 so **live reload works inside the container too** — edit a file, watch it restart.
 Note for Docker + Azure keyless auth: `az login` doesn't exist inside the container,
@@ -53,7 +92,56 @@ Qdrant has a visual dashboard: http://localhost:7833/dashboard — great on a sh
 | 5 | `POST /search` | Paraphrased query still finds the right chunk — cosine scores, descending |
 | 6 | `POST /ask` `use_rag=false` | The model guesses (or refuses) — inspect `prompt_sent` |
 | 7 | `POST /ask` `use_rag=true` | Grounded answer with [1] [2] citations — compare `prompt_sent` now |
+<<<<<<< HEAD
 | 8 | `DELETE /collection` | Clean slate for the next group |
+=======
+| 8 | `GET /agents` | Four personas, loaded from JSON files on disk |
+| 9 | `POST /ask` `agent=default` → `agent=lyrical` | Same facts, same citations, completely different voice |
+| 10 | Edit `personas/lyrical.json`, save, ask again | Behaviour changes with **no restart** — behaviour is data |
+| 11 | `DELETE /collection` | Clean slate for the next group |
+
+## Agents
+
+Every file in `app/agents/personas/*.json` is one agent. The JSON is re-read whenever
+it changes on disk, so editing a persona mid-demo changes the next answer.
+
+```bash
+GET  /agents              # list personas (name, rules, temperature)
+GET  /agents/{name}       # one persona + the EXACT system prompt its JSON produces
+POST /ask                 # {"question": "...", "agent": "lyrical", "agent_mode": "local"}
+POST /agents/{name}/deploy  # publish it to Azure AI Foundry Agent Service
+```
+
+Two execution lanes, switched by `AGENT_MODE` (or per request via `agent_mode`):
+
+| Lane | Where the loop runs | Works with | Needs |
+|---|---|---|---|
+| `local` | inside this app | any provider (openai, anthropic, lmstudio, azure) | nothing extra |
+| `foundry` | Azure AI Foundry Agent Service | Azure only | `AZURE_AI_PROJECT_ENDPOINT`, Entra auth (`az login`), *Azure AI User* role |
+
+```bash
+# publish a persona to Foundry and get its agent id
+uv run python scripts/deploy_agent.py lyrical
+
+# call the hosted agent directly, without FastAPI in the way
+uv run python scripts/invoke_agent.py "What fee applies to early repayment?" --persona lyrical
+```
+
+API keys are **not accepted** by the Agent Service — it is Entra-only. Set
+`AZURE_AI_AUTH=identity` and `az login` for that lane.
+
+## Tools (specialist services)
+
+```bash
+POST /tools/web-fetch    # a deliberately plain scraper — read its `warnings` array
+POST /tools/speak        # text → WAV (Azure AI Speech; needs AZURE_SPEECH_KEY/REGION)
+POST /tools/transcribe   # upload a WAV → text
+```
+
+`/tools/web-fetch` exists to be honest about scraping: it reports what the naive
+approach could not do (JavaScript rendering, bot walls, consent banners, non-HTML
+formats). That list is the argument for managed grounding.
+>>>>>>> main
 
 Chunking strategies (`strategy` in the request body): `static` (fixed windows),
 `sentence` (N sentences per chunk), `dynamic` (paragraph/sentence-aware packing with
