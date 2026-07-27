@@ -9,7 +9,9 @@ qdrant-client>=1.12
 openai>=1.50
 anthropic>=0.40
 azure-ai-inference>=1.0.0b9
+azure-ai-projects>=1.0.0
 azure-identity>=1.17
+tiktoken>=0.7
 
 # server-rendered admin console
 jinja2>=3.1

@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+{% block title %}Tools{% endblock %}
+{% block content %}
+  <header class="page-heading">
+    <div>
+      <span class="eyebrow">Specialist services</span>
+      <h1>Tools</h1>
+      <p>Exercise the web extraction and Azure Speech capabilities exposed by the backend.</p>
+    </div>
+  </header>
+
+  <section class="panel">
+    <header class="panel-header">
+      <div><span class="eyebrow">POST /tools/web-fetch</span><h2>Web fetch</h2></div>
+    </header>
+    <form class="tool-form" method="post" action="/tools/web-fetch">
+      <label class="grow">URL<input type="url" name="url" value="{{ url }}" required></label>
+      <label class="compact-field">Max chars<input type="number" name="max_chars" min="200" max="200000" value="{{ max_chars }}" required></label>
+      <button class="button primary">Fetch</button>
+    </form>
+
+    {% if web_result %}
+      <div class="badge-row">
+        <span class="status-pill">HTTP {{ web_result.status_code }}</span>
+        <span class="status-pill">{{ web_result.chars }} chars</span>
+        <span class="status-pill">~{{ web_result.approx_tokens }} tokens</span>
+        <span class="status-pill {{ 'error' if web_result.warnings else 'ok' }}">
+          {{ web_result.warnings | length }} warnings
+        </span>
+      </div>
+      {% if web_result.warnings %}
+        <ul class="warning-list">{% for warning in web_result.warnings %}<li>{{ warning }}</li>{% endfor %}</ul>
+      {% endif %}
+      <label>Extracted text</label>
+      <pre class="code-block tool-output">{{ web_result.text or '(nothing extracted)' }}</pre>
+    {% endif %}
+  </section>
+
+  <section class="panel">
+    <header class="panel-header">
+      <div><span class="eyebrow">POST /tools/speak</span><h2>Text to speech</h2></div>
+    </header>
+    <form method="post" action="/tools/speak" target="speech-player">
+      <label>Text<textarea name="text" rows="3" maxlength="3000" required>{{ speech_text }}</textarea></label>
+      <div class="tool-form">
+        <label class="grow">Voice (optional)<input name="voice" placeholder="e.g. en-US-AvaMultilingualNeural"></label>
+        <button class="button primary">Synthesize and play</button>
+      </div>
+    </form>
+    <iframe class="audio-frame" name="speech-player" title="Generated speech"></iframe>
+  </section>
+
+  <section class="panel">
+    <header class="panel-header">
+      <div><span class="eyebrow">POST /tools/transcribe</span><h2>Speech to text</h2></div>
+    </header>
+    <form class="tool-form" method="post" action="/tools/transcribe" enctype="multipart/form-data">
+      <label class="grow">Audio file<input type="file" name="file" accept="audio/*,.wav" required></label>
+      <button class="button primary">Transcribe</button>
+    </form>
+    {% if transcript %}
+      <div class="answer-box"><span>TXT</span><p>{{ transcript.text }}</p></div>
+      <p class="token-usage">
+        status {{ transcript.status }} · confidence {{ transcript.confidence or '—' }} ·
+        {{ transcript.duration_seconds }} seconds
+      </p>
+    {% endif %}
+  </section>
+{% endblock %}

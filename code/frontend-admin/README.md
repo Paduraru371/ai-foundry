@@ -11,13 +11,16 @@ It calls the RAG backend at `http://localhost:7799`.
 | Knowledge Base | Preview chunks, ingest documents, inspect and reset the collection |
 | Search | Run semantic searches and inspect similarity scores |
 | Test Answer | Compare answers with or without RAG and inspect the final prompt |
+| Agents | Inspect personas, prompts and Foundry deployments |
+| Tools | Test web extraction, text-to-speech and transcription |
+| Platform Status | Inspect backend health, Azure resources and masked configuration |
 
 Unavailable services, missing provider configuration and API errors are displayed.
 
 ## Run the Frontend
 
-From the `ai-foundry` directory, with the  virtual environment already set
-up, use the command for your operating system.
+From the repository root, use the command for your operating system. The
+scripts build and run the FastAPI admin frontend with Docker.
 
 Linux:
 

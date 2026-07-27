@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+{% block title %}Platform Status{% endblock %}
+{% block content %}
+  <header class="page-heading">
+    <div>
+      <span class="eyebrow">Diagnostics</span>
+      <h1>Platform status</h1>
+      <p>Detailed health, Azure environment and masked runtime configuration.</p>
+    </div>
+    <a class="button secondary" href="/status">Refresh</a>
+  </header>
+
+  <section class="panel">
+    <header class="panel-header"><div><span class="eyebrow">GET /health</span><h2>Health</h2></div></header>
+    {% if health %}
+      <div class="metric-grid">
+        <div><span>API</span><strong>{{ health.status }}</strong></div>
+        <div><span>Vector store</span><strong>{{ health.qdrant }}</strong><small>{{ health.qdrant_url }}</small></div>
+        <div><span>Chat model</span><strong>{{ health.llm.provider }}</strong><small>{{ health.llm.model }}</small></div>
+        <div><span>Embeddings</span><strong>{{ health.embeddings.provider }}</strong><small>{{ health.embeddings.model }}</small></div>
+        <div><span>Agent mode</span><strong>{{ health.agents.mode }}</strong><small>{{ health.agents.default_persona }}</small></div>
+        <div><span>Speech</span><strong>{{ 'configured' if health.speech.configured else 'not configured' }}</strong><small>{{ health.speech.region or '' }}</small></div>
+      </div>
+      <details><summary class="details-summary">Show raw health response</summary><pre class="code-block">{{ health | tojson(indent=2) }}</pre></details>
+    {% endif %}
+  </section>
+
+  <section class="panel">
+    <header class="panel-header">
+      <div><span class="eyebrow">GET /azure</span><h2>Azure environment</h2></div>
+      <div class="inline-actions">
+        {% if azure and azure.foundry_url %}<a class="button secondary small" href="{{ azure.foundry_url }}" target="_blank" rel="noreferrer">Foundry portal</a>{% endif %}
+        {% if azure and azure.portal_url %}<a class="button secondary small" href="{{ azure.portal_url }}" target="_blank" rel="noreferrer">Azure portal</a>{% endif %}
+      </div>
+    </header>
+    {% if azure and azure.configured %}
+      <div class="table-scroll">
+        <table class="data-table">
+          <tbody>
+            {% for label, value in [
+              ('Resource', azure.resource), ('Resource group', azure.resource_group),
+              ('Project', azure.project), ('Region', azure.location),
+              ('Subscription', azure.subscription_id), ('Authentication', azure.auth),
+              ('Chat deployment', azure.chat_deployment),
+              ('Embedding deployment', azure.embedding_deployment),
+              ('Inference endpoint', azure.inference_endpoint),
+              ('Project endpoint', azure.project_endpoint),
+              ('Azure OpenAI endpoint', azure.openai_endpoint)
+            ] %}
+              {% if value %}<tr><th>{{ label }}</th><td class="mono-cell">{{ value }}</td></tr>{% endif %}
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% if azure.auth_note %}<div class="warning-notice">{{ azure.auth_note }}</div>{% endif %}
+      {% if azure.deployments and azure.deployments.available %}
+        <h3>Model deployments</h3>
+        <div class="table-scroll">
+          <table class="data-table">
+            <thead><tr><th>Deployment</th><th>Model</th><th>Version</th><th>SKU</th><th>TPM</th><th>State</th></tr></thead>
+            <tbody>
+              {% for deployment in azure.deployments['items'] %}
+                <tr>
+                  <td>{{ deployment.name }}</td><td>{{ deployment.model }}</td>
+                  <td>{{ deployment.version }}</td><td>{{ deployment.sku }}</td>
+                  <td>{{ deployment.capacity }}</td><td>{{ deployment.state }}</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% elif azure.deployments %}
+        <p class="muted">{{ azure.deployments.reason }}</p>
+      {% endif %}
+    {% else %}
+      <p class="muted">No Azure endpoint is configured.</p>
+    {% endif %}
+  </section>
+
+  <section class="panel">
+    <header class="panel-header"><div><span class="eyebrow">GET /config</span><h2>Configuration</h2></div></header>
+    {% if config %}
+      <div class="config-grid">
+        {% for name, values in config.items() %}
+          <div><label>{{ name }}</label><pre class="code-block">{{ values | tojson(indent=2) }}</pre></div>
+        {% endfor %}
+      </div>
+    {% endif %}
+  </section>
+{% endblock %}

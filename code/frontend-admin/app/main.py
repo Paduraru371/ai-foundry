@@ -4,9 +4,10 @@ from __future__ import annotations
 import asyncio
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlencode
 
-from fastapi import FastAPI, Form, Request
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi import FastAPI, File, Form, Request, UploadFile
+from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
@@ -42,6 +43,20 @@ def render(
 def error_context(exc: BackendError) -> dict[str, Any]:
     """Convert a backend exception into values understood by the html templates"""
     return {"error": exc.message, "error_status": exc.status_code}
+
+
+async def load_agents() -> dict[str, Any]:
+    """Return the backend agent inventory in a template-friendly shape."""
+    data = await rag_api.agents()
+    return {
+        "agents": data.get("personas", []),
+        "hosted_only": data.get("hosted_only", []),
+        "foundry": data.get("foundry"),
+        "agent_defaults": {
+            "agent": data.get("default_persona", "default"),
+            "agent_mode": data.get("active_mode", "local"),
+        },
+    }
 
 
 # Service overview 
@@ -204,7 +219,22 @@ async def run_search(
 # Answer generation
 @app.get("/ask", response_class=HTMLResponse)
 async def ask_page(request: Request) -> HTMLResponse:
-    return render(request, "ask.html", active_page="ask", question="", top_k=3, use_rag=True)
+    context: dict[str, Any] = {
+        "active_page": "ask",
+        "question": "",
+        "top_k": 3,
+        "use_rag": True,
+        "agent": "default",
+        "agent_mode": "local",
+        "agents": [],
+        "hosted_only": [],
+    }
+    try:
+        context.update(await load_agents())
+        context.update(context.pop("agent_defaults"))
+    except BackendError as exc:
+        context.update(error_context(exc))
+    return render(request, "ask.html", **context)
 
 
 @app.post("/ask", response_class=HTMLResponse)
@@ -213,31 +243,219 @@ async def run_ask(
     question: str = Form(min_length=1),
     top_k: int = Form(ge=1, le=50),
     use_rag: bool = Form(default=False),
+    agent: str = Form(default="default"),
+    agent_mode: str = Form(default="local"),
 ) -> HTMLResponse:
+    context: dict[str, Any] = {
+        "active_page": "ask",
+        "question": question,
+        "top_k": top_k,
+        "use_rag": use_rag,
+        "agent": agent,
+        "agent_mode": agent_mode,
+        "agents": [],
+        "hosted_only": [],
+    }
     try:
-        result = await rag_api.ask(question.strip(), use_rag, top_k)
+        agent_context = await load_agents()
+        agent_context.pop("agent_defaults", None)
+        context.update(agent_context)
+    except BackendError:
+        pass
+
+    try:
+        result = await rag_api.ask(
+            question.strip(), use_rag, top_k, agent, agent_mode
+        )
         # retrieved context uses the same order as search
         result["retrieved"] = sorted(
-            result["retrieved"], key=lambda hit: hit["score"], reverse=True
+            result.get("retrieved", []), key=lambda hit: hit["score"], reverse=True
         )
-        
+
+        return render(request, "ask.html", result=result, **context)
+
+    except BackendError as exc:
+        return render(request, "ask.html", **context, **error_context(exc))
+
+
+# Agents
+@app.get("/agents", response_class=HTMLResponse)
+async def agents_page(request: Request, detail: str | None = None) -> HTMLResponse:
+    context: dict[str, Any] = {
+        "active_page": "agents",
+        "agents": [],
+        "hosted_only": [],
+    }
+    try:
+        context.update(await load_agents())
+        context.pop("agent_defaults", None)
+        context["azure"] = await rag_api.azure()
+        if detail:
+            context["detail"] = await rag_api.agent(detail)
+    except BackendError as exc:
+        context.update(error_context(exc))
+    return render(request, "agents.html", **context)
+
+
+@app.post("/agents/deploy")
+async def deploy_agent(request: Request, name: str = Form(min_length=1)) -> HTMLResponse:
+    try:
+        result = await rag_api.deploy_agent(name)
+        message = f"{result.get('action', 'Deployed')} {name} in Foundry."
+        return RedirectResponse(
+            f"/agents?{urlencode({'notice': message})}", status_code=303
+        )
+    except BackendError as exc:
+        context: dict[str, Any] = {"agents": [], "hosted_only": []}
+        try:
+            context.update(await load_agents())
+            context.pop("agent_defaults", None)
+        except BackendError:
+            pass
         return render(
             request,
-            "ask.html",
-            active_page="ask",
-            question=question,
-            top_k=top_k,
-            use_rag=use_rag,
-            result=result,
+            "agents.html",
+            active_page="agents",
+            **context,
+            **error_context(exc),
         )
-        
+
+
+@app.post("/agents/hosted/delete")
+async def delete_hosted_agent(
+    request: Request, agent_id: str = Form(min_length=1), name: str = Form(min_length=1)
+) -> HTMLResponse:
+    try:
+        await rag_api.delete_hosted_agent(agent_id)
+        return RedirectResponse(
+            f"/agents?{urlencode({'notice': f'Removed {name} from Foundry.'})}",
+            status_code=303,
+        )
+    except BackendError as exc:
+        context: dict[str, Any] = {"agents": [], "hosted_only": []}
+        try:
+            context.update(await load_agents())
+            context.pop("agent_defaults", None)
+        except BackendError:
+            pass
+        return render(
+            request,
+            "agents.html",
+            active_page="agents",
+            **context,
+            **error_context(exc),
+        )
+
+
+# Tools
+@app.get("/tools", response_class=HTMLResponse)
+async def tools_page(request: Request) -> HTMLResponse:
+    return render(
+        request,
+        "tools.html",
+        active_page="tools",
+        url="https://example.com",
+        max_chars=20000,
+        speech_text="Your card was blocked after three failed PIN attempts.",
+    )
+
+
+@app.post("/tools/web-fetch", response_class=HTMLResponse)
+async def web_fetch(
+    request: Request,
+    url: str = Form(min_length=1),
+    max_chars: int = Form(ge=200, le=200000),
+) -> HTMLResponse:
+    try:
+        result = await rag_api.web_fetch(url.strip(), max_chars)
+        return render(
+            request,
+            "tools.html",
+            active_page="tools",
+            url=url,
+            max_chars=max_chars,
+            speech_text="Your card was blocked after three failed PIN attempts.",
+            web_result=result,
+        )
     except BackendError as exc:
         return render(
             request,
-            "ask.html",
-            active_page="ask",
-            question=question,
-            top_k=top_k,
-            use_rag=use_rag,
+            "tools.html",
+            active_page="tools",
+            url=url,
+            max_chars=max_chars,
+            speech_text="Your card was blocked after three failed PIN attempts.",
             **error_context(exc),
         )
+
+
+@app.post("/tools/speak")
+async def speak(
+    text: str = Form(min_length=1), voice: str = Form(default="")
+) -> Response:
+    try:
+        audio = await rag_api.speak(text, voice or None)
+        return Response(
+            content=audio,
+            media_type="audio/wav",
+            headers={"Content-Disposition": 'inline; filename="libra-assist.wav"'},
+        )
+    except BackendError as exc:
+        return Response(content=exc.message, status_code=exc.status_code or 502)
+
+
+@app.post("/tools/transcribe", response_class=HTMLResponse)
+async def transcribe(request: Request, file: UploadFile = File(...)) -> HTMLResponse:
+    content = await file.read()
+    try:
+        result = await rag_api.transcribe(
+            file.filename or "audio.wav",
+            content,
+            file.content_type or "audio/wav",
+        )
+        return render(
+            request,
+            "tools.html",
+            active_page="tools",
+            url="https://example.com",
+            max_chars=20000,
+            speech_text="Your card was blocked after three failed PIN attempts.",
+            transcript=result,
+        )
+    except BackendError as exc:
+        return render(
+            request,
+            "tools.html",
+            active_page="tools",
+            url="https://example.com",
+            max_chars=20000,
+            speech_text="Your card was blocked after three failed PIN attempts.",
+            **error_context(exc),
+        )
+
+
+# Detailed platform status
+@app.get("/status", response_class=HTMLResponse)
+async def status_page(request: Request) -> HTMLResponse:
+    health_result, config_result, azure_result = await asyncio.gather(
+        rag_api.health(),
+        rag_api.config(),
+        rag_api.azure(),
+        return_exceptions=True,
+    )
+    context: dict[str, Any] = {
+        "active_page": "status",
+        "health": None if isinstance(health_result, Exception) else health_result,
+        "config": None if isinstance(config_result, Exception) else config_result,
+        "azure": None if isinstance(azure_result, Exception) else azure_result,
+        "backend_online": not isinstance(health_result, Exception),
+    }
+    errors = [
+        result
+        for result in (health_result, config_result, azure_result)
+        if isinstance(result, BackendError)
+    ]
+    if errors:
+        context["error"] = " | ".join(error.message for error in errors)
+        context["error_status"] = errors[0].status_code
+    return render(request, "status.html", **context)

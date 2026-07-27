@@ -148,7 +148,8 @@ The helper does not remove Docker volumes, so existing Qdrant data remains
 available. It also does nothing when no legacy containers exist. In normal use,
 do not run a `docker-utils` script directly; use the `start-backend` or
 `start-all` script for your operating system.
-=======
+
+==========================================================================================================================
 
 # AI Engineering on Azure — Libra Bank Academy
 

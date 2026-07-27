@@ -1,0 +1,104 @@
+{% extends "base.html" %}
+{% block title %}Agents{% endblock %}
+{% block content %}
+  <header class="page-heading">
+    <div>
+      <span class="eyebrow">Agent platform</span>
+      <h1>Agents</h1>
+      <p>Inspect local personas and manage their hosted copies in Azure AI Foundry.</p>
+    </div>
+    <a class="button secondary" href="/agents">Refresh</a>
+  </header>
+
+  {% if request.query_params.get('notice') %}
+    <div class="success-notice">{{ request.query_params.get('notice') }}</div>
+  {% endif %}
+
+  {% if foundry and not foundry.available %}
+    <div class="warning-notice">
+      <strong>Hosted state is unknown.</strong> {{ foundry.reason }}
+    </div>
+  {% endif %}
+
+  <section class="panel">
+    <header class="panel-header">
+      <div>
+        <span class="eyebrow">GET /agents</span>
+        <h2>{{ (agents | length) + (hosted_only | length) }} available agents</h2>
+      </div>
+      {% if azure and azure.foundry_url %}
+        <a class="button secondary" href="{{ azure.foundry_url }}" target="_blank" rel="noreferrer">
+          Open Foundry portal
+        </a>
+      {% endif %}
+    </header>
+
+    <div class="table-scroll">
+      <table class="data-table">
+        <thead>
+          <tr><th>Agent</th><th>Runs on</th><th>Description</th><th>Temperature</th><th>Actions</th></tr>
+        </thead>
+        <tbody>
+          {% for item in agents + hosted_only %}
+            <tr>
+              <td>
+                <strong>{{ item.display_name }}</strong>
+                <small class="mono-block">{{ item.name }}</small>
+                {% if item.hosted %}<small class="mono-block">{{ item.hosted.agent_id }}</small>{% endif %}
+              </td>
+              <td>
+                <span class="status-pill {{ 'configured' if item.runs_on in ['both', 'foundry'] else '' }}">
+                  {{ item.runs_on }}
+                </span>
+                {% if item.hosted and item.hosted.model %}<small class="mono-block">{{ item.hosted.model }}</small>{% endif %}
+              </td>
+              <td>
+                {{ item.description }}
+                {% if item.style_rules %}
+                  <ul class="compact-list">{% for rule in item.style_rules %}<li>{{ rule }}</li>{% endfor %}</ul>
+                {% endif %}
+              </td>
+              <td>{{ item.temperature if item.temperature is not none else '—' }}</td>
+              <td>
+                <div class="inline-actions">
+                  {% if item.runs_on != 'foundry' %}
+                    <a class="button secondary small" href="/agents?detail={{ item.name | urlencode }}">Prompt</a>
+                    <form method="post" action="/agents/deploy">
+                      <input type="hidden" name="name" value="{{ item.name }}">
+                      <button class="button primary small">
+                        {{ 'Update hosted' if item.runs_on == 'both' else 'Deploy' }}
+                      </button>
+                    </form>
+                  {% endif %}
+                  {% if item.hosted %}
+                    <form method="post" action="/agents/hosted/delete"
+                          onsubmit="return confirm('Remove this hosted agent from Foundry? The local persona remains available.');">
+                      <input type="hidden" name="agent_id" value="{{ item.hosted.agent_id }}">
+                      <input type="hidden" name="name" value="{{ item.name }}">
+                      <button class="button danger small">Remove hosted</button>
+                    </form>
+                  {% endif %}
+                </div>
+              </td>
+            </tr>
+          {% else %}
+            <tr><td colspan="5" class="muted">No agents could be loaded.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  {% if detail %}
+    <section class="panel">
+      <header class="panel-header">
+        <div><span class="eyebrow">Persona prompt</span><h2>{{ detail.display_name }}</h2></div>
+      </header>
+      <p class="muted">{{ detail.file }}</p>
+      <label>Grounded prompt</label>
+      <pre class="code-block">{{ detail.system_prompt_grounded }}</pre>
+      <label>Plain prompt</label>
+      <pre class="code-block">{{ detail.system_prompt_plain }}</pre>
+    </section>
+  {% endif %}
+{% endblock %}

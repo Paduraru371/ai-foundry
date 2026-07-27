@@ -1,17 +1,13 @@
 $ErrorActionPreference = "Stop"
 
 $ProjectRoot = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
-$ComposeFile = Join-Path $ProjectRoot "code\backend\docker\compose.yml"
+$BackendComposeFile = Join-Path $ProjectRoot "code\backend\docker\compose.yml"
+$FrontendComposeFile = Join-Path $ProjectRoot "code\frontend-admin\docker\compose.yml"
 $EnvFile = Join-Path $ProjectRoot ".env"
 $Credentials = Join-Path $ProjectRoot ".credentials"
-$VenvPython = Join-Path $ProjectRoot ".venv\Scripts\python.exe"
-$FrontendDir = Join-Path $ProjectRoot "code\frontend-admin"
 
 . (Join-Path $PSScriptRoot "docker-utils.ps1")
 
-if (-not (Test-Path $VenvPython)) {
-    throw "The shared virtual environment is missing. Run .\scripts\windows\setup.ps1 first."
-}
 if (-not (Test-Path $EnvFile) -or -not (Test-Path $Credentials)) {
     throw ".env or .credentials is missing. Run .\scripts\windows\setup.ps1 first."
 }
@@ -26,18 +22,25 @@ if ($LASTEXITCODE -ne 0) {
 
 Remove-LegacyBackendContainers
 
-$ComposeArgs = @(
+$BackendComposeArgs = @(
     "compose",
     "--env-file", $Credentials,
     "--env-file", $EnvFile,
-    "-f", $ComposeFile
+    "-f", $BackendComposeFile
 )
+$FrontendComposeArgs = @("compose", "-f", $FrontendComposeFile)
 
 try {
     Write-Host "Starting backend containers..."
-    & docker @ComposeArgs up -d --build
+    & docker @BackendComposeArgs up -d --build
     if ($LASTEXITCODE -ne 0) {
         throw "Docker Compose could not start the backend."
+    }
+
+    Write-Host "Starting the admin frontend container..."
+    & docker @FrontendComposeArgs up -d --build
+    if ($LASTEXITCODE -ne 0) {
+        throw "Docker Compose could not start the admin frontend."
     }
 
     Write-Host ""
@@ -50,14 +53,11 @@ try {
     Write-Host "Press Ctrl+C to stop all services."
     Write-Host ""
 
-    & $VenvPython -m uvicorn app.main:app `
-        --app-dir $FrontendDir `
-        --host 127.0.0.1 `
-        --port 7800 `
-        --reload
+    & docker @FrontendComposeArgs logs -f admin
 }
 finally {
     Write-Host ""
-    Write-Host "Stopping backend containers..."
-    & docker @ComposeArgs down
+    Write-Host "Stopping frontend and backend containers..."
+    & docker @FrontendComposeArgs down
+    & docker @BackendComposeArgs down
 }

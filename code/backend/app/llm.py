@@ -26,7 +26,15 @@ class LLM:
         self.model = model
         self._client = client
  
-    def chat(self, system: str, user: str, temperature: float, max_tokens: int) -> ChatResult:
+    def chat(
+        self,
+        system: str,
+        user: str,
+        temperature: float,
+        max_tokens: int,
+        extras: dict | None = None,
+    ) -> ChatResult:
+        extras = extras or {}
         if self.provider in ("lmstudio", "openai"):
             kwargs: dict = {
                 "model": self.model,
@@ -41,6 +49,7 @@ class LLM:
                 kwargs["max_completion_tokens"] = max_tokens
             else:
                 kwargs["max_tokens"] = max_tokens
+            kwargs.update(extras)
                 
             r = self._client.chat.completions.create(**kwargs)
             u = getattr(r, "usage", None)
@@ -95,10 +104,15 @@ class LLM:
             # gpt-5.x reasoning family: only the default temperature (1) is
             # accepted, and the token cap is passed as max_completion_tokens
             # (model_extras merges it into the request body).
-            kwargs["model_extras"] = {"max_completion_tokens": max_tokens}
+            kwargs["model_extras"] = {
+                "max_completion_tokens": max_tokens,
+                **extras,
+            }
         else:
             kwargs["temperature"] = temperature
             kwargs["max_tokens"] = max_tokens
+            if extras:
+                kwargs["model_extras"] = extras
             
         r = self._client.complete(**kwargs)
         

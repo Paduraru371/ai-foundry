@@ -1,20 +1,19 @@
 $ErrorActionPreference = "Stop"
 
 $ProjectRoot = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
-$VenvPython = Join-Path $ProjectRoot ".venv\Scripts\python.exe"
-$FrontendDir = Join-Path $ProjectRoot "code\frontend-admin"
+$ComposeFile = Join-Path $ProjectRoot "code\frontend-admin\docker\compose.yml"
 
-if (-not (Test-Path $VenvPython)) {
-    throw "The shared virtual environment is missing. Run .\scripts\windows\setup.ps1 first."
+if (-not (Get-Command docker -ErrorAction SilentlyContinue)) {
+    throw "Docker Desktop is not installed or Docker is not available in PATH."
+}
+& docker info *> $null
+if ($LASTEXITCODE -ne 0) {
+    throw "Docker Desktop is installed, but its engine is not running."
 }
 
 Write-Host "Starting the Libra Assist admin console..."
 Write-Host "Frontend: http://localhost:7800"
 Write-Host ""
 
-& $VenvPython -m uvicorn app.main:app `
-    --app-dir $FrontendDir `
-    --host 127.0.0.1 `
-    --port 7800 `
-    --reload
+& docker compose -f $ComposeFile up --build
 exit $LASTEXITCODE

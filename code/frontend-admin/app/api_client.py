@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from typing import Any
+from urllib.parse import quote
 
 import httpx
 
@@ -24,14 +25,18 @@ class RagApiClient:
         method: str,
         path: str,
         payload: dict[str, Any] | None = None,
-    ) -> dict[str, Any]:
+        *,
+        files: dict[str, tuple[str, bytes, str]] | None = None,
+        raw: bool = False,
+    ) -> dict[str, Any] | bytes:
         try:
             # the timeout prevents a provider outage from hanging the frontend forever
             async with httpx.AsyncClient(timeout=REQUEST_TIMEOUT) as client:
                 response = await client.request(
                     method,
                     f"{BACKEND_URL}{path}",
-                    json=payload,
+                    json=payload if files is None else None,
+                    files=files,
                 )
                 
         except httpx.RequestError as exc:
@@ -51,7 +56,7 @@ class RagApiClient:
                 
             raise BackendError(str(detail), response.status_code)
 
-        return response.json()
+        return response.content if raw else response.json()
 
     async def health(self) -> dict[str, Any]:
         return await self._request("GET", "/health")
@@ -71,15 +76,65 @@ class RagApiClient:
     async def search(self, query: str, top_k: int) -> dict[str, Any]:
         return await self._request("POST", "/search", {"query": query, "top_k": top_k})
 
-    async def ask(self, question: str, use_rag: bool, top_k: int) -> dict[str, Any]:
+    async def ask(
+        self,
+        question: str,
+        use_rag: bool,
+        top_k: int,
+        agent: str = "default",
+        agent_mode: str = "local",
+    ) -> dict[str, Any]:
         return await self._request(
             "POST",
             "/ask",
-            {"question": question, "use_rag": use_rag, "top_k": top_k},
+            {
+                "question": question,
+                "use_rag": use_rag,
+                "top_k": top_k,
+                "agent": agent,
+                "agent_mode": agent_mode,
+            },
         )
 
     async def reset_collection(self) -> dict[str, Any]:
         return await self._request("DELETE", "/collection")
+
+    async def agents(self) -> dict[str, Any]:
+        return await self._request("GET", "/agents")
+
+    async def agent(self, name: str) -> dict[str, Any]:
+        return await self._request("GET", f"/agents/{quote(name, safe='')}")
+
+    async def deploy_agent(self, name: str) -> dict[str, Any]:
+        return await self._request("POST", f"/agents/{quote(name, safe='')}/deploy")
+
+    async def delete_hosted_agent(self, agent_id: str) -> dict[str, Any]:
+        return await self._request(
+            "DELETE", f"/agents/hosted/{quote(agent_id, safe='')}"
+        )
+
+    async def azure(self) -> dict[str, Any]:
+        return await self._request("GET", "/azure")
+
+    async def web_fetch(self, url: str, max_chars: int) -> dict[str, Any]:
+        return await self._request(
+            "POST", "/tools/web-fetch", {"url": url, "max_chars": max_chars}
+        )
+
+    async def speak(self, text: str, voice: str | None = None) -> bytes:
+        result = await self._request(
+            "POST", "/tools/speak", {"text": text, "voice": voice}, raw=True
+        )
+        return bytes(result)
+
+    async def transcribe(
+        self, filename: str, content: bytes, content_type: str
+    ) -> dict[str, Any]:
+        return await self._request(
+            "POST",
+            "/tools/transcribe",
+            files={"file": (filename, content, content_type)},
+        )
 
 
 # routes use  stateless client
