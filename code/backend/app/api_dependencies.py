@@ -1,0 +1,89 @@
+"""Shared RAG pipeline dependencies used by multiple API routers."""
+from __future__ import annotations
+
+from fastapi import HTTPException
+
+from . import chunking
+from .config import settings
+from .embeddings import get_embedder
+from .schemas import ChunkInfo, ChunkRequest
+from .vectorstore import VectorStore
+
+store = VectorStore()
+
+
+def chunk_params(req: ChunkRequest) -> dict:
+    return {
+        "strategy": (req.strategy or settings.chunk_strategy).lower(),
+        "size": req.chunk_size or settings.chunk_size,
+        "overlap": (
+            req.chunk_overlap
+            if req.chunk_overlap is not None
+            else settings.chunk_overlap
+        ),
+        "per_chunk": req.sentences_per_chunk or settings.sentences_per_chunk,
+        "threshold": req.semantic_threshold or settings.semantic_threshold,
+    }
+
+
+def do_chunk(req: ChunkRequest) -> tuple[list[str], dict]:
+    params = chunk_params(req)
+    embed_fn = embedder().embed if params["strategy"] == "semantic" else None
+    try:
+        pieces = chunking.chunk(
+            req.text,
+            params["strategy"],
+            size=params["size"],
+            overlap=params["overlap"],
+            per_chunk=params["per_chunk"],
+            threshold=params["threshold"],
+            embed_fn=embed_fn,
+            document_title=req.document_title,
+        )
+    except ValueError as error:
+        raise HTTPException(status_code=422, detail=str(error))
+    return pieces, params
+
+
+def chunk_infos(pieces: list[str]) -> list[ChunkInfo]:
+    return [
+        ChunkInfo(
+            index=index,
+            text=text,
+            chars=len(text),
+            approx_tokens=max(1, round(len(text) / 4)),
+        )
+        for index, text in enumerate(pieces)
+    ]
+
+
+def embedder():
+    try:
+        return get_embedder()
+    except Exception as error:
+        raise HTTPException(
+            status_code=502,
+            detail=f"Embedding provider not usable: {error}",
+        )
+
+
+def embed(texts: list[str]) -> list[list[float]]:
+    try:
+        return embedder().embed(texts)
+    except HTTPException:
+        raise
+    except Exception as error:
+        raise HTTPException(
+            status_code=502,
+            detail=f"Embedding call failed ({settings.embedding_provider}): {error}",
+        )
+
+
+def require_qdrant() -> None:
+    if not store.ping():
+        raise HTTPException(
+            status_code=503,
+            detail=f"Qdrant is not reachable at {settings.qdrant_url} — "
+                   "start the Docker services with the platform-specific "
+                   "start-backend script",
+        )

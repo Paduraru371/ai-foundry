@@ -13,7 +13,7 @@ class Settings(BaseSettings):
     qdrant_collection: str = "libra_rag"
 
     # --- chunking defaults (overridable per request) ------------------------
-    chunk_strategy: str = "dynamic"        # static | dynamic | sentence | semantic
+    chunk_strategy: str = "dynamic"        # static | dynamic | heading | sentence | semantic
     chunk_size: int = 500                  # target chunk size, characters
     chunk_overlap: int = 80                # characters carried over between chunks
     sentences_per_chunk: int = 3           # for the 'sentence' strategy

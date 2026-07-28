@@ -14,6 +14,14 @@ from qdrant_client import QdrantClient, models
 
 from .config import settings
 
+POINT_ID_NAMESPACE = uuid.UUID("8ca82e2d-605f-4e4e-91b5-8a0991249b62")
+
+
+def stable_chunk_id(source: str | None, index: int) -> str:
+    """Return the same Qdrant-compatible UUID for a document chunk every time."""
+    source_key = (source or "adhoc").strip() or "adhoc"
+    return str(uuid.uuid5(POINT_ID_NAMESPACE, f"{source_key}:{index}"))
+
 
 class DimensionMismatch(Exception):
     def __init__(self, existing: int, incoming: int) -> None:
@@ -52,7 +60,7 @@ class VectorStore:
     # --- data ----------------------------------------------------------------
     def upsert(self, chunks: list[str], vectors: list[list[float]], strategy: str,
                source: str | None) -> list[str]:
-        ids = [str(uuid.uuid4()) for _ in chunks]
+        ids = [stable_chunk_id(source, index) for index in range(len(chunks))]
         now = datetime.now(timezone.utc).isoformat(timespec="seconds")
         self.client.upsert(
             collection_name=self.collection,
