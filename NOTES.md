@@ -29,3 +29,35 @@ Without RAG, only the question is sent.
 The `lyrical` agent can run **locally** because it is listed in the local persona configuration.
 
 During testing, `runs_on` was `unknown` and `foundry.available` was `false`, so the hosted Foundry status could not be verified.
+
+## Assignment 3 — Part 4
+
+### Implemented ingestion improvements
+
+1. **Heading-aware chunking:** the new `heading` strategy removes YAML frontmatter
+   from embedded prose, splits Markdown on headings, retains the full nested section
+   path, and repeats the heading when a long section needs multiple chunks.
+2. **Chunk context and hierarchy:** every heading-aware chunk begins with
+   `Document: <title>`, `Section: <H1 > H2 > H3 path>`, and an explicit
+   `Order: section x/y, part a/b`. The title comes from the loader/frontmatter;
+   the response chunk index remains the global document order.
+3. **Stable chunk IDs:** Qdrant IDs are deterministic UUIDv5 values derived from
+   `source + chunk index`. Re-ingesting the same source therefore replaces matching
+   points instead of assigning fresh IDs.
+4. **Corpus loader:** from `code/backend`, run:
+
+   ```bash
+   uv run python scripts/ingest_corpus.py
+   ```
+
+   The loader finds all corpus Markdown files, ignores `data/README.md`, and uses the
+   `heading` strategy by default. `--dry-run` previews the 16 documents.
+
+### Verification
+
+- Unit tests: **6 passed**.
+- Loader dry run: **16 documents found**.
+- Stable-ID integration check against a temporary Qdrant collection: first ingest
+  **2 points**, second ingest **2 points**, with identical IDs.
+- API-level heading request: passed; the returned chunk starts with the frontmatter
+  title and current Markdown section.
