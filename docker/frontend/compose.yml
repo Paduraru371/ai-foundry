@@ -1,0 +1,27 @@
+name: ai-acad-frontend
+
+services:
+  frontend:
+    build:
+      context: ../../frontend
+      dockerfile: ../docker/frontend/Dockerfile
+      target: dev
+    container_name: rag-frontend
+    ports:
+      - "7800:7800"
+    environment:
+      VITE_API_TARGET: http://rag-api:7799
+    volumes:
+      - ../../frontend/src:/srv/src
+      - ../../frontend/index.html:/srv/index.html
+      - ../../frontend/vite.config.js:/srv/vite.config.js
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks:
+      - default
+      - backend
+
+networks:
+  backend:
+    external: true
+    name: ai-acad-backend_default

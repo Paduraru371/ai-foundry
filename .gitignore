@@ -34,10 +34,6 @@ npm-debug.log*
 pnpm-debug.log*
 yarn-error.log*
 
-# --- heartbeat app runtime artifacts ---
-resources/heartbeat-app/heartbeat-log.jsonl
-resources/heartbeat-app/server.out
-
 # --- Secrets / local config (never commit Azure keys or endpoints) ---
 *.local
 secrets.*
@@ -45,12 +41,11 @@ secrets.*
 local.settings.json
 
 # --- frontend ---
-code/frontend/node_modules/
-code/frontend/dist/
+frontend/node_modules/
+frontend/dist/
 
 # --- local run logs ---
-code/backend/*.log
-code/frontend/*.log
+*.log
 
 # --- local editor/agent tooling state ---
 .claude/

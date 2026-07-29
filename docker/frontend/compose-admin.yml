@@ -1,0 +1,26 @@
+name: ai-acad-frontend-admin
+
+services:
+  frontend-admin:
+    build:
+      context: ../..
+      dockerfile: docker/frontend/admin.Dockerfile
+    container_name: rag-frontend-admin
+    ports:
+      - "7800:7800"
+    environment:
+      BACKEND_URL: http://rag-api:7799
+    volumes:
+      - ../../frontend-admin/app:/srv/app
+      - ../../frontend-admin/static:/srv/static
+      - ../../frontend-admin/templates:/srv/templates
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks:
+      - default
+      - backend
+
+networks:
+  backend:
+    external: true
+    name: ai-acad-backend_default

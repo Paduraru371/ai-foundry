@@ -1,0 +1,42 @@
+name: ai-acad-backend
+
+services:
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: rag-qdrant
+    ports:
+      - "7833:6333"
+      - "7834:6334"
+    volumes:
+      - qdrant-data:/qdrant/storage
+
+  api:
+    build:
+      context: ../..
+      dockerfile: docker/backend/Dockerfile
+    container_name: rag-api
+    command:
+      - python
+      - -m
+      - uvicorn
+      - backend.main:app
+      - --host
+      - 0.0.0.0
+      - --port
+      - "7799"
+      - --reload
+    ports:
+      - "7799:7799"
+    env_file: ../../.env
+    environment:
+      QDRANT_URL: http://qdrant:6333
+      AZURE_AI_AUTH: ${DOCKER_AZURE_AI_AUTH:-key}
+    volumes:
+      - ../../backend:/srv/backend
+    depends_on:
+      - qdrant
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+volumes:
+  qdrant-data:

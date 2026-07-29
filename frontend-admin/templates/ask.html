@@ -1,0 +1,283 @@
+{% extends "base.html" %}
+{% block title %}Test Answer{% endblock %}
+{% block content %}
+  <header class="page-heading">
+    <div>
+      <span class="eyebrow">Augmented generation</span>
+      <h1>Test an answer</h1>
+      <p>Review the final answer, retrieved context, and exact prompt sent to the model.</p>
+    </div>
+  </header>
+
+  <section class="panel">
+    <header class="panel-header">
+      <div><span class="eyebrow">POST /ask</span><h2>Question for Libra Assist</h2></div>
+    </header>
+    <form method="post" action="/ask">
+      <label>
+        Operator question
+        <textarea id="question-input" name="question" rows="4" required
+          placeholder="e.g. What should I do if my card is blocked?">{{ question }}</textarea>
+      </label>
+      <div class="voice-controls">
+        <button id="record-question" class="button secondary" type="button">
+          Start microphone
+        </button>
+        <span id="recording-status" class="muted" role="status">
+          Speak your question and stop when finished.
+        </span>
+      </div>
+      <div class="ask-settings">
+        <label class="agent-field">
+          Agent
+          <select name="agent">
+            {% for item in agents %}
+              <option value="{{ item.name }}" {{ 'selected' if agent == item.name else '' }}>
+                {{ item.display_name }}
+              </option>
+            {% endfor %}
+            {% if hosted_only %}
+              <optgroup label="Foundry only">
+                {% for item in hosted_only %}
+                  <option value="{{ item.name }}" {{ 'selected' if agent == item.name else '' }}>
+                    {{ item.display_name }}
+                  </option>
+                {% endfor %}
+              </optgroup>
+            {% endif %}
+            {% if not agents and not hosted_only %}
+              <option value="{{ agent }}">{{ agent }}</option>
+            {% endif %}
+          </select>
+        </label>
+        <label class="agent-field">
+          Execution
+          <select name="agent_mode">
+            <option value="local" {{ 'selected' if agent_mode == 'local' else '' }}>Local agent</option>
+            <option value="foundry" {{ 'selected' if agent_mode == 'foundry' else '' }}>Foundry agent</option>
+          </select>
+        </label>
+        <label class="checkbox">
+          <input name="use_rag" type="checkbox" value="true" {{ 'checked' if use_rag else '' }}>
+          <span><strong>Use RAG</strong><small>Add relevant chunks to the prompt</small></span>
+        </label>
+        <label class="checkbox">
+          <input name="speak_answer" type="checkbox" value="true"
+            {{ 'checked' if speak_answer else '' }}>
+          <span><strong>Agent voice</strong><small>Read the answer aloud</small></span>
+        </label>
+        <label class="compact-field">
+          Top K
+          <input name="top_k" type="number" min="1" max="50" value="{{ top_k }}" required>
+        </label>
+        <button class="button primary">→ Generate answer</button>
+      </div>
+    </form>
+  </section>
+
+  {% if result %}
+    {# Keep the answer, retrieval evidence, and final prompt in separate panels. #}
+    <section class="panel">
+      <header class="panel-header">
+        <div>
+          <span class="eyebrow">Answer {{ 'with' if result.augmented else 'without' }} RAG</span>
+          <h2>Model answer</h2>
+        </div>
+        <span class="model-badge">✦ {{ result.provider }} · {{ result.model }}</span>
+      </header>
+      <div class="answer-box"><span>AI</span><p>{{ result.answer }}</p></div>
+      <div class="voice-controls">
+        <button id="play-answer" class="button secondary" type="button">
+          Play answer
+        </button>
+        <audio id="answer-audio" controls hidden></audio>
+        <span id="speech-status" class="muted" role="status"></span>
+      </div>
+      {% if result.agent %}
+        <div class="badge-row">
+          <span class="status-pill configured">{{ result.agent.display_name }}</span>
+          <span class="status-pill">{{ result.agent.mode }}</span>
+          <span class="status-pill">{{ 'grounded' if result.augmented else 'no retrieval' }}</span>
+        </div>
+      {% endif %}
+      {% if result.usage %}
+        <p class="token-usage">
+          Prompt tokens: {{ result.usage.prompt_tokens or '—' }} ·
+          completion tokens: {{ result.usage.completion_tokens or '—' }}
+        </p>
+      {% endif %}
+    </section>
+
+    <section class="panel">
+      <header class="panel-header">
+        <div><span class="eyebrow">Context</span><h2>Retrieved chunks ({{ result.retrieved | length }})</h2></div>
+      </header>
+      {% with hits=result.retrieved %}{% include "_hits.html" %}{% endwith %}
+    </section>
+
+    <section class="panel">
+      <header class="panel-header">
+        <div><span class="eyebrow">Transparency</span><h2>Prompt sent to the model</h2></div>
+      </header>
+      <p class="muted">The exact message built by the backend after retrieval:</p>
+      <pre class="code-block prompt">{{ result.prompt_sent }}</pre>
+      <details>
+        <summary class="details-summary">Show system prompt</summary>
+        <pre class="code-block">{{ result.system_prompt }}</pre>
+      </details>
+    </section>
+  {% else %}
+    <div class="empty-state">The answer, retrieved chunks, and full prompt will appear here.</div>
+  {% endif %}
+
+  <script>
+    (() => {
+      const recordButton = document.getElementById("record-question");
+      const questionInput = document.getElementById("question-input");
+      const recordingStatus = document.getElementById("recording-status");
+      let recorder = null;
+
+      function downsample(samples, inputRate, outputRate) {
+        if (inputRate === outputRate) return samples;
+        const ratio = inputRate / outputRate;
+        const output = new Float32Array(Math.round(samples.length / ratio));
+        for (let index = 0; index < output.length; index += 1) {
+          const start = Math.round(index * ratio);
+          const end = Math.min(Math.round((index + 1) * ratio), samples.length);
+          let sum = 0;
+          for (let source = start; source < end; source += 1) sum += samples[source];
+          output[index] = sum / Math.max(1, end - start);
+        }
+        return output;
+      }
+
+      function wavBlob(chunks, sampleRate) {
+        const length = chunks.reduce((total, chunk) => total + chunk.length, 0);
+        const merged = new Float32Array(length);
+        let offset = 0;
+        chunks.forEach((chunk) => {
+          merged.set(chunk, offset);
+          offset += chunk.length;
+        });
+        const pcm = downsample(merged, sampleRate, 16000);
+        const buffer = new ArrayBuffer(44 + pcm.length * 2);
+        const view = new DataView(buffer);
+        const write = (at, value) => {
+          for (let i = 0; i < value.length; i += 1) {
+            view.setUint8(at + i, value.charCodeAt(i));
+          }
+        };
+        write(0, "RIFF");
+        view.setUint32(4, 36 + pcm.length * 2, true);
+        write(8, "WAVE");
+        write(12, "fmt ");
+        view.setUint32(16, 16, true);
+        view.setUint16(20, 1, true);
+        view.setUint16(22, 1, true);
+        view.setUint32(24, 16000, true);
+        view.setUint32(28, 32000, true);
+        view.setUint16(32, 2, true);
+        view.setUint16(34, 16, true);
+        write(36, "data");
+        view.setUint32(40, pcm.length * 2, true);
+        pcm.forEach((sample, index) => {
+          const clamped = Math.max(-1, Math.min(1, sample));
+          view.setInt16(
+            44 + index * 2,
+            clamped < 0 ? clamped * 32768 : clamped * 32767,
+            true,
+          );
+        });
+        return new Blob([view], { type: "audio/wav" });
+      }
+
+      async function stopRecording() {
+        const current = recorder;
+        recorder = null;
+        current.stream.getTracks().forEach((track) => track.stop());
+        current.processor.disconnect();
+        current.source.disconnect();
+        current.silent.disconnect();
+        await current.context.close();
+        recordButton.textContent = "Start microphone";
+        recordingStatus.textContent = "Transcribing...";
+
+        const form = new FormData();
+        form.append("file", wavBlob(current.chunks, current.sampleRate), "question.wav");
+        const response = await fetch("/ask/transcribe", { method: "POST", body: form });
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.detail || "Transcription failed.");
+        questionInput.value = result.text || "";
+        recordingStatus.textContent = result.text
+          ? "Question transcribed. You can edit it before sending."
+          : "No speech was recognized. Please try again.";
+        questionInput.focus();
+      }
+
+      recordButton?.addEventListener("click", async () => {
+        try {
+          if (recorder) {
+            await stopRecording();
+            return;
+          }
+          const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+          const context = new AudioContext();
+          const source = context.createMediaStreamSource(stream);
+          const processor = context.createScriptProcessor(4096, 1, 1);
+          const silent = context.createGain();
+          const chunks = [];
+          silent.gain.value = 0;
+          processor.onaudioprocess = (event) => {
+            chunks.push(new Float32Array(event.inputBuffer.getChannelData(0)));
+          };
+          source.connect(processor);
+          processor.connect(silent);
+          silent.connect(context.destination);
+          recorder = {
+            stream,
+            context,
+            source,
+            processor,
+            silent,
+            chunks,
+            sampleRate: context.sampleRate,
+          };
+          recordButton.textContent = "Stop and transcribe";
+          recordingStatus.textContent = "Recording...";
+        } catch (error) {
+          recordingStatus.textContent = error.message;
+        }
+      });
+
+      const answerText = {{ (result.answer if result else "") | tojson }};
+      const autoSpeak = {{ (speak_answer if speak_answer is defined else false) | tojson }};
+      const playButton = document.getElementById("play-answer");
+      const audio = document.getElementById("answer-audio");
+      const speechStatus = document.getElementById("speech-status");
+
+      async function playAnswer() {
+        if (!answerText || !audio) return;
+        speechStatus.textContent = "Generating voice...";
+        const form = new FormData();
+        form.append("text", answerText);
+        const response = await fetch("/tools/speak", { method: "POST", body: form });
+        if (!response.ok) throw new Error(await response.text());
+        audio.src = URL.createObjectURL(await response.blob());
+        audio.hidden = false;
+        speechStatus.textContent = "";
+        await audio.play();
+      }
+
+      playButton?.addEventListener("click", () => {
+        playAnswer().catch((error) => {
+          speechStatus.textContent = error.message;
+        });
+      });
+      if (autoSpeak && answerText) {
+        playAnswer().catch(() => {
+          speechStatus.textContent = "Press Play answer to hear the response.";
+        });
+      }
+    })();
+  </script>
+{% endblock %}

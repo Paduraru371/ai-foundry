@@ -1,0 +1,4 @@
+services:
+  frontend:
+    environment:
+      VITE_API_TARGET: http://host.docker.internal:7799

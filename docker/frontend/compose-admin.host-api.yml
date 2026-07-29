@@ -1,0 +1,4 @@
+services:
+  frontend-admin:
+    environment:
+      BACKEND_URL: http://host.docker.internal:7799
