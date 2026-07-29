@@ -2,7 +2,7 @@
 # Kept local, never committed.
 _raw_inputs/
 
-/.credentials
+.env
 
 # --- IDE ---
 .idea/

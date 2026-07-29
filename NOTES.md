@@ -55,9 +55,33 @@ During testing, `runs_on` was `unknown` and `foundry.available` was `false`, so 
 
 ### Verification
 
-- Unit tests: **6 passed**.
+- Unit tests: **15 passed**.
 - Loader dry run: **16 documents found**.
-- Stable-ID integration check against a temporary Qdrant collection: first ingest
-  **2 points**, second ingest **2 points**, with identical IDs.
+- Before/after stable-ID comparison against an in-memory Qdrant collection, using
+  the same two-chunk document twice:
+  - **Before** (random UUIDs): **2 points after the first ingest, 4 after the
+    second** (**+100%**, duplicated).
+  - **After** (deterministic UUIDv5 IDs): **2 points after the first ingest, 2
+    after the second** (**0% growth**, replaced in place).
 - API-level heading request: passed; the returned chunk starts with the frontmatter
   title and current Markdown section.
+
+## Assignment 3 — Part 5
+
+1. **Re-ranking** retrieves at least 10 candidates for `/ask`, improves their initial
+   order with cosine similarity plus exact query-term coverage, then asks the
+   configured model to choose the final passages. This fixes cases where semantically
+   broad text ranked above a passage containing the actual policy terms; invalid
+   model output safely falls back to the deterministic order. Demonstration question:
+   **"What is the business onboarding fee?"**
+2. **Deduplication and diversity** remove near-identical passages and apply a small
+   similarity penalty to the remaining candidates, fixing wasted context slots.
+   Demonstration question: **"When does an incomplete application expire?"**
+3. **Score threshold** drops cosine hits below **0.30**; `/search` reports that
+   nothing relevant was found and `/ask` stops before the LLM can invent an answer.
+   Demonstration question: **"What is the weather in Cluj?"**
+
+The retrieval unit cases measured all three effects: an exact-term hit with cosine
+**0.58** moved above a generic hit at **0.60** after re-ranking; two identical
+passages plus one different passage became **2** diverse results instead of **3**;
+and a weak hit at **0.29** produced **0** results at the **0.30** threshold.
