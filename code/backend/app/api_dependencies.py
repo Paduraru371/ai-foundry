@@ -6,6 +6,7 @@ from fastapi import HTTPException
 from . import chunking
 from .config import settings
 from .embeddings import get_embedder
+from .retrieval import improve_retrieval
 from .schemas import ChunkInfo, ChunkRequest
 from .vectorstore import VectorStore
 
@@ -87,3 +88,31 @@ def require_qdrant() -> None:
                    "start the Docker services with the platform-specific "
                    "start-backend script",
         )
+
+
+def retrieve(
+    query: str,
+    top_k: int,
+    min_score: float | None = None,
+    query_vector: list[float] | None = None,
+) -> list[dict]:
+    """Retrieve a broad pool, then threshold, re-rank, and diversify it."""
+    threshold = (
+        min_score
+        if min_score is not None
+        else settings.retrieval_score_threshold
+    )
+    candidate_limit = min(
+        50,
+        max(top_k, settings.retrieval_candidate_pool, top_k * 3),
+    )
+    query_vector = query_vector or embed([query])[0]
+    candidates = store.search(query_vector, candidate_limit)
+    return improve_retrieval(
+        query,
+        candidates,
+        top_k,
+        min_score=threshold,
+        vector_weight=settings.retrieval_vector_weight,
+        duplicate_threshold=settings.retrieval_duplicate_threshold,
+    )

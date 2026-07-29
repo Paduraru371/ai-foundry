@@ -9,6 +9,7 @@ from ..api_dependencies import (
     embed,
     embedder,
     require_qdrant,
+    retrieve,
     store,
 )
 from ..config import settings
@@ -91,11 +92,21 @@ def search(req: SearchRequest) -> SearchResponse:
         )
     top_k = req.top_k or settings.top_k
     query_vector = embed([req.query])[0]
-    hits = store.search(query_vector, top_k)
+    min_score = (
+        req.min_score
+        if req.min_score is not None
+        else settings.retrieval_score_threshold
+    )
+    hits = retrieve(req.query, top_k, min_score, query_vector)
     return SearchResponse(
         query=req.query,
         top_k=top_k,
         embedding_model=embedder().describe(),
         query_embedding_preview=[round(value, 5) for value in query_vector[:8]],
         hits=[SearchHit(**hit) for hit in hits],
+        message=(
+            None
+            if hits
+            else f"Nothing relevant found at or above score {min_score:.2f}."
+        ),
     )

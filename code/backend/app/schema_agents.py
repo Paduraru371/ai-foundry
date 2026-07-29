@@ -19,6 +19,12 @@ class AskRequest(BaseModel):
     question: str = Field(..., min_length=1)
     use_rag: bool = Field(True, description="false = plain LLM; true = retrieve then augment")
     top_k: Optional[int] = Field(None, ge=1, le=50)
+    min_score: Optional[float] = Field(
+        None,
+        ge=-1,
+        le=1,
+        description="Minimum cosine similarity for retrieved context",
+    )
     temperature: Optional[float] = Field(None, ge=0, le=2)
     agent: Optional[str] = Field(
         None,

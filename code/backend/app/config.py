@@ -21,6 +21,10 @@ class Settings(BaseSettings):
 
     # --- retrieval / generation defaults ------------------------------------
     top_k: int = 4
+    retrieval_score_threshold: float = 0.30
+    retrieval_candidate_pool: int = 10
+    retrieval_vector_weight: float = 0.75
+    retrieval_duplicate_threshold: float = 0.82
     llm_temperature: float = 0.2
     llm_max_tokens: int = 2500   # reasoning models spend part of this budget thinking
 

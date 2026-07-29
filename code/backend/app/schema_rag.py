@@ -85,6 +85,12 @@ class SearchRequest(BaseModel):
 
     query: str = Field(..., min_length=1)
     top_k: Optional[int] = Field(None, ge=1, le=50)
+    min_score: Optional[float] = Field(
+        None,
+        ge=-1,
+        le=1,
+        description="Minimum cosine similarity; defaults to RETRIEVAL_SCORE_THRESHOLD",
+    )
 
 
 class SearchHit(BaseModel):
@@ -93,6 +99,14 @@ class SearchHit(BaseModel):
     index: Optional[int] = None
     strategy: Optional[str] = None
     source: Optional[str] = None
+    lexical_score: Optional[float] = Field(
+        None,
+        description="Fraction of meaningful query terms found in this passage",
+    )
+    rerank_score: Optional[float] = Field(
+        None,
+        description="Combined semantic and lexical score used for final ordering",
+    )
     id: str
 
 
@@ -102,6 +116,7 @@ class SearchResponse(BaseModel):
     embedding_model: dict
     query_embedding_preview: list[float]
     hits: list[SearchHit]
+    message: Optional[str] = None
 
 
 class CollectionInfo(BaseModel):

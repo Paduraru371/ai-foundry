@@ -5,11 +5,13 @@ from fastapi import APIRouter, HTTPException
 
 from ..agents import foundry_agent, local_agent
 from ..agents.persona import PersonaNotFound, load_persona
-from ..api_dependencies import embed, require_qdrant, store
+from ..api_dependencies import require_qdrant, retrieve, store
 from ..config import settings
+from ..reranker import rerank_with_llm
 from ..schemas import AgentInfo, AskRequest, AskResponse, SearchHit, Usage
 
 router = APIRouter()
+NO_RELEVANT_CONTEXT = "Nothing relevant was found in the knowledge base."
 
 
 @router.post("/ask", response_model=AskResponse, tags=["4 · generation"])
@@ -41,10 +43,55 @@ def ask(req: AskRequest) -> AskResponse:
                        "or set use_rag=false for a plain LLM answer.",
             )
         top_k = req.top_k or settings.top_k
-        query_vector = embed([req.question])[0]
+        candidates = retrieve(
+            req.question,
+            max(10, top_k),
+            req.min_score,
+        )
         retrieved = [
-            SearchHit(**hit) for hit in store.search(query_vector, top_k)
+            SearchHit(**hit)
+            for hit in rerank_with_llm(req.question, candidates, top_k)
         ]
+        if not retrieved:
+            threshold = (
+                req.min_score
+                if req.min_score is not None
+                else settings.retrieval_score_threshold
+            )
+            info = (
+                AgentInfo(
+                    name=persona.name,
+                    display_name=persona.display_name,
+                    description=persona.description,
+                    mode=mode_requested,
+                    temperature=persona.temperature,
+                    style_rules=persona.style_rules,
+                )
+                if persona is not None
+                else AgentInfo(
+                    name=hosted_only["name"],
+                    display_name=hosted_only["name"],
+                    description=hosted_only.get("description")
+                    or "Hosted in Foundry — no local persona file.",
+                    mode=mode_requested,
+                )
+            )
+            system_prompt = (
+                persona.system_prompt(grounded=True)
+                if persona is not None
+                else "Answer only from relevant retrieved knowledge-base passages."
+            )
+            return AskResponse(
+                answer=f"{NO_RELEVANT_CONTEXT} Minimum score: {threshold:.2f}.",
+                augmented=True,
+                provider="retrieval",
+                model="score-threshold",
+                agent=info,
+                system_prompt=system_prompt,
+                prompt_sent=req.question,
+                retrieved=[],
+                usage=Usage(prompt_tokens=0, completion_tokens=0),
+            )
 
     chunks = [hit.model_dump() for hit in retrieved]
     try:

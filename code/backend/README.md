@@ -222,6 +222,18 @@ Firewall dropping the inbound connection to `python.exe`.
 | 10 | Edit `personas/lyrical.json`, save, ask again | Behaviour changes with **no restart** — behaviour is data |
 | 11 | `DELETE /collection` | Clean slate for the next group |
 
+Retrieval now uses three quality controls. `/search` accepts an optional
+`min_score` and returns `message: "Nothing relevant found..."` when every cosine
+match is below it. Surviving candidates are re-ranked using semantic similarity
+plus exact query-term coverage and near-duplicates are removed. Grounded `/ask`
+also retrieves a broader pool and asks the configured model to select the final
+passages before answer generation; malformed re-ranker output safely falls back
+to the deterministic order.
+
+```json
+{"query": "What is the business onboarding fee?", "top_k": 3, "min_score": 0.30}
+```
+
 ## Agents
 
 Every file in `app/agents/personas/*.json` is one agent. The JSON is re-read whenever

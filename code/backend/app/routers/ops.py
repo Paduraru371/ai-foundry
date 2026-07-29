@@ -69,6 +69,10 @@ def config() -> dict:
         },
         "retrieval": {
             "top_k": settings.top_k,
+            "score_threshold": settings.retrieval_score_threshold,
+            "candidate_pool": settings.retrieval_candidate_pool,
+            "vector_weight": settings.retrieval_vector_weight,
+            "duplicate_threshold": settings.retrieval_duplicate_threshold,
             "collection": settings.qdrant_collection,
             "qdrant_url": settings.qdrant_url,
         },
