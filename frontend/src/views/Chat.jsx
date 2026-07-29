@@ -42,12 +42,14 @@ export default function Chat({ agents, hostedOnly = [], foundry }) {
   const isHosted = current?.runs_on === 'both' || current?.runs_on === 'foundry'
   const localImpossible = current?.runs_on === 'foundry'      // no JSON file to run here
   const foundryBlocked =
-    foundryReachable === false ||                             // no identity — nothing can
+    foundryReachable !== true ||                              // still checking, or no identity
     (foundryReachable === true && !isHosted)                  // reachable, but not deployed
   const foundryWhy =
     foundryReachable === false
       ? (foundry?.reason || 'The Agent Service cannot be reached from here.')
-      : 'Not deployed to Foundry — deploy it from the Agents view'
+      : foundryReachable === undefined
+        ? 'Checking the Foundry Agent Service…'
+        : 'Not deployed to Foundry — deploy it from the Agents view'
 
   // Keep the mode legal whenever the selected agent changes.
   useEffect(() => {
@@ -84,6 +86,7 @@ export default function Chat({ agents, hostedOnly = [], foundry }) {
           </option>
           <option value="foundry" disabled={foundryBlocked} title={foundryBlocked ? foundryWhy : ''}>
             Foundry agent{foundryReachable === false ? ' — no identity'
+                          : foundryReachable === undefined ? ' — checking'
                           : foundryBlocked ? ' — not deployed' : ''}
           </option>
         </select>
@@ -92,6 +95,11 @@ export default function Chat({ agents, hostedOnly = [], foundry }) {
         {foundryReachable === false && (
           <span className="badge muted" title={foundryWhy}>
             hosted agents off — key auth
+          </span>
+        )}
+        {foundryReachable === true && current && !isHosted && (
+          <span className="badge gold" title={foundryWhy}>
+            deploy “{current.display_name}” from Agents first
           </span>
         )}
         <button className="btn btn-outline btn-sm" onClick={() => setMessages([])}>clear</button>
