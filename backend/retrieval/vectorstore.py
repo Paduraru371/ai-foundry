@@ -58,25 +58,68 @@ class VectorStore:
         return False
 
     # --- data ----------------------------------------------------------------
+    def _scroll_source(
+        self,
+        source: str,
+        *,
+        with_payload: bool,
+    ) -> list:
+        points: list = []
+        offset = None
+        source_filter = models.Filter(
+            must=[
+                models.FieldCondition(
+                    key="source",
+                    match=models.MatchValue(value=source),
+                )
+            ]
+        )
+        while True:
+            page, offset = self.client.scroll(
+                collection_name=self.collection,
+                scroll_filter=source_filter,
+                limit=256,
+                offset=offset,
+                with_payload=with_payload,
+                with_vectors=False,
+            )
+            points.extend(page)
+            if offset is None:
+                break
+        return points
+
+    def delete_source(self, source: str) -> int:
+        """Delete only chunks belonging to one source, preserving the corpus."""
+        source_name = source.strip()
+        if not source_name or not self.client.collection_exists(self.collection):
+            return 0
+        points = self._scroll_source(source_name, with_payload=False)
+        point_ids = [point.id for point in points]
+        if point_ids:
+            self.client.delete(
+                collection_name=self.collection,
+                points_selector=models.PointIdsList(points=point_ids),
+                wait=True,
+            )
+        return len(point_ids)
+
+    def source_snapshot(self, source: str) -> list[dict]:
+        """Return stored IDs and payloads used for incremental-index checks."""
+        source_name = source.strip()
+        if not source_name or not self.client.collection_exists(self.collection):
+            return []
+        points = self._scroll_source(source_name, with_payload=True)
+        return [
+            {"id": str(point.id), "payload": dict(point.payload or {})}
+            for point in points
+        ]
+
     def upsert(self, chunks: list[str], vectors: list[list[float]], strategy: str,
-               source: str | None) -> list[str]:
+               source: str | None, fingerprint: str | None = None) -> list[str]:
         source_name = source.strip() if source and source.strip() else None
         old_ids: set[str] = set()
         if source_name:
-            points, _ = self.client.scroll(
-                collection_name=self.collection,
-                scroll_filter=models.Filter(
-                    must=[
-                        models.FieldCondition(
-                            key="source",
-                            match=models.MatchValue(value=source_name),
-                        )
-                    ]
-                ),
-                limit=10_000,
-                with_payload=False,
-                with_vectors=False,
-            )
+            points = self._scroll_source(source_name, with_payload=False)
             old_ids = {str(point.id) for point in points}
         ids = [stable_chunk_id(source, index) for index in range(len(chunks))]
         now = datetime.now(timezone.utc).isoformat(timespec="seconds")
@@ -91,6 +134,8 @@ class VectorStore:
                         "index": i,
                         "strategy": strategy,
                         "source": source or "adhoc",
+                        "index_fingerprint": fingerprint,
+                        "index_chunk_count": len(chunks),
                         "ingested_at": now,
                     },
                 )

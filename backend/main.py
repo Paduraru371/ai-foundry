@@ -28,7 +28,7 @@ from .api.routers.agents import (
     agents_list,
 )
 from .api.routers.azure import azure_status
-from .api.routers.generation import ask
+from .api.routers.generation import ask, generation_cancel
 from .api.routers.ops import config, health
 from .api.routers.rag import (
     chunk_only,
@@ -36,6 +36,8 @@ from .api.routers.rag import (
     collection_reset,
     ingest,
     search,
+    source_document,
+    source_document_download,
 )
 from .api.routers.tools import speak, transcribe, web_fetch
 
@@ -79,9 +81,12 @@ __all__ = [
     "collection_reset",
     "config",
     "extract_document",
+    "generation_cancel",
     "health",
     "ingest",
     "search",
+    "source_document",
+    "source_document_download",
     "speak",
     "store",
     "transcribe",

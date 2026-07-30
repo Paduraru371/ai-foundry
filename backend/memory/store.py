@@ -3,9 +3,10 @@ from __future__ import annotations
 
 import json
 import sqlite3
+from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, Iterator
 from uuid import uuid4
 
 from ..core.config import settings
@@ -36,11 +37,15 @@ class SessionStore:
         self.path.parent.mkdir(parents=True, exist_ok=True)
         self._initialize()
 
-    def _connect(self) -> sqlite3.Connection:
+    @contextmanager
+    def _connect(self) -> Iterator[sqlite3.Connection]:
         connection = sqlite3.connect(self.path, timeout=10)
         connection.execute("PRAGMA foreign_keys = ON")
         connection.execute("PRAGMA busy_timeout = 10000")
-        return connection
+        try:
+            yield connection
+        finally:
+            connection.close()
 
     def _initialize(self) -> None:
         with self._connect() as connection:
@@ -160,7 +165,12 @@ class SessionStore:
             ).fetchall()
         return [self._message(row) for row in reversed(rows)]
 
-    def compaction_payload(self, session_id: str, keep: int) -> dict | None:
+    def compaction_payload(
+        self,
+        session_id: str,
+        keep: int,
+        min_new_messages: int = 1,
+    ) -> dict | None:
         with self._connect() as connection:
             session = connection.execute(
                 """
@@ -188,7 +198,7 @@ class SessionStore:
                 """,
                 (session_id, int(session[1] or 0), int(boundary[0])),
             ).fetchall()
-        if not rows:
+        if len(rows) < max(1, min_new_messages):
             return None
         return {
             "previous_summary": str(session[0] or ""),

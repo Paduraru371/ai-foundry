@@ -7,7 +7,7 @@ services:
       dockerfile: docker/frontend/admin.Dockerfile
     container_name: rag-frontend-admin
     ports:
-      - "7800:7800"
+      - "${FRONTEND_ADMIN_PORT:-7800}:7800"
     environment:
       BACKEND_URL: http://rag-api:7799
     volumes:

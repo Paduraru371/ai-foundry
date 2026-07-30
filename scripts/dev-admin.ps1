@@ -6,7 +6,10 @@
   Uses the same development workflow as dev.ps1, selecting frontend-admin.
 #>
 param(
+    [ValidateRange(1, 65535)]
     [int]$Port = 7799,
+    [ValidateRange(1, 65535)]
+    [int]$FrontendPort = 7800,
     [switch]$BindAll,
     [switch]$SkipDocker,
     [switch]$NoReload,

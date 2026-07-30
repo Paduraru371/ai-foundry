@@ -66,6 +66,8 @@ class IngestRequest(ChunkRequest):
 
 
 class IngestResponse(BaseModel):
+    status: Literal["indexed", "unchanged"] = "indexed"
+    fingerprint: Optional[str] = None
     strategy: Strategy
     count: int
     vector_dimension: int

@@ -1,0 +1,67 @@
+[
+  {
+    "id": "retail-eligibility",
+    "question": "Who is eligible to open a personal account online?",
+    "expected_sources": ["01_personal_online_account_eligibility"]
+  },
+  {
+    "id": "individual-documents",
+    "question": "Which identity documents are accepted for an individual?",
+    "expected_sources": ["02_accepted_documents_for_individuals"]
+  },
+  {
+    "id": "video-identification",
+    "question": "What checks are performed during video identification?",
+    "expected_sources": ["03_video_identification_and_identity_validation"]
+  },
+  {
+    "id": "personal-procedure",
+    "question": "What are the complete steps of personal onboarding?",
+    "expected_sources": ["04_complete_personal_onboarding_procedure"]
+  },
+  {
+    "id": "manual-review",
+    "question": "When is an onboarding application sent for manual review?",
+    "expected_sources": ["05_manual_review_and_processing_times"]
+  },
+  {
+    "id": "activation",
+    "question": "When is the account activated and mobile banking enabled?",
+    "expected_sources": ["06_account_activation_and_mobile_banking"]
+  },
+  {
+    "id": "business-documents",
+    "question": "What documents are required from a Romanian company?",
+    "expected_sources": ["10_required_company_documents"]
+  },
+  {
+    "id": "beneficial-owner",
+    "question": "How is a beneficial owner identified in the ownership structure?",
+    "expected_sources": ["11_beneficial_owner_and_ownership_structure"]
+  },
+  {
+    "id": "business-fees-2026",
+    "question": "What business onboarding fees apply in 2026?",
+    "expected_sources": ["13_business_onboarding_fees_2026"]
+  },
+  {
+    "id": "pep-sanctions",
+    "question": "How are PEP, sanctions and high-risk cases handled?",
+    "expected_sources": ["16_pep_sanctions_and_high_risk"]
+  },
+  {
+    "id": "retry-policy-2026",
+    "question": "How many identification retries are allowed under the 2026 policy?",
+    "expected_sources": ["19_identification_retries_2026"]
+  },
+  {
+    "id": "complaints",
+    "question": "How can a rejected onboarding decision be reconsidered or complained about?",
+    "expected_sources": ["20_rejection_reconsideration_and_complaints"]
+  },
+  {
+    "id": "retention",
+    "question": "How are onboarding records retained and protected?",
+    "expected_sources": ["21_data_protection_and_record_retention"]
+  }
+]

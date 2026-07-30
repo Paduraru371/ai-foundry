@@ -3,9 +3,12 @@ from __future__ import annotations
 
 import asyncio
 import json
+import re
+import unicodedata
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlencode
+from uuid import uuid4
 
 from fastapi import FastAPI, File, Form, Request, UploadFile
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
@@ -25,6 +28,121 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 app = FastAPI(title="Libra Assist Admin", version="1.0.0")
 app.mount("/static", StaticFiles(directory=BASE_DIR / "static"), name="static")
 templates = Jinja2Templates(directory=BASE_DIR / "templates")
+active_chat_generations: dict[str, asyncio.Task] = {}
+NUMERIC_CITATION = re.compile(
+    r"\s*\[\s*\d+(?:\s*(?:,|[-–])\s*\d+)*\s*\]"
+)
+
+
+def infer_document_request(
+    message: str,
+    delivery: str,
+    document_type: str,
+    response_format: str,
+) -> tuple[str, str, str]:
+    """Infer explicit delivery and structure requests written naturally."""
+    folded = "".join(
+        character
+        for character in unicodedata.normalize("NFKD", message.casefold())
+        if not unicodedata.combining(character)
+    )
+    kind_patterns = {
+        "pdf": r"\bpdf\b",
+        "docx": r"\b(?:docx|word)\b",
+        "pptx": r"\b(?:pptx?|powerpoint|slide(?:-uri|uri|s)?)\b",
+        "json": r"\bjson\b",
+        "md": r"\b(?:markdown|fisier md)\b",
+        "txt": r"\b(?:txt|fisier text)\b",
+    }
+    requested_kind = next(
+        (kind for kind, pattern in kind_patterns.items() if re.search(pattern, folded)),
+        None,
+    )
+    export_action = re.search(
+        r"\b(?:genereaza|creeaza|exporta|descarca|download|generate|create|export)\w*\b",
+        folded,
+    )
+    explicit_format = re.search(
+        r"\b(?:ca|intr-un|in|format(?:ul)?)\s+(?:de\s+)?"
+        r"(?:pdf|docx|word|pptx?|powerpoint|json|markdown|txt)\b",
+        folded,
+    )
+    document_noun = re.search(
+        r"\b(?:document|fisier|raport|report|file|prezentare|presentation|slide)\w*\b",
+        folded,
+    )
+    plain_text_file = (
+        bool(export_action)
+        and bool(re.search(r"\b(?:plain text|text simplu)\b", folded))
+        and bool(document_noun or re.search(r"\b(?:genereaza|creeaza|exporta)\b", folded))
+    )
+    if plain_text_file and requested_kind is None:
+        requested_kind = "txt"
+    if requested_kind and (export_action or explicit_format or document_noun):
+        delivery = "document"
+        document_type = requested_kind
+    elif export_action and document_noun:
+        delivery = "document"
+    speech_intent = re.search(
+        r"\b(?:"
+        r"raspun\w*(?:-mi)?\s+(?:vocal|audio|cu\s+voce)"
+        r"|raspun\w*(?:-mi)?\b[^\n.!?]{0,100}\b(?:vocal|audio|cu\s+voce)\b"
+        r"|raspuns(?:ul)?\s+(?:vocal|audio)"
+        r"|(?:in\s+format|printr-un|printr\s+un)\s+(?:fisier\s+)?audio"
+        r"|(?:spune|citeste)(?:-mi)?\s+(?:cu\s+voce|raspunsul)"
+        r"|cu\s+voce"
+        r"|answer\w*\s+(?:aloud|by\s+voice)"
+        r"|(?:voice|audio)\s+(?:answer|response)"
+        r"|speak\s+(?:the\s+)?answer"
+        r")\b",
+        folded,
+    )
+    speech_denial = re.search(
+        r"\b(?:"
+        r"(?:fara|not|without)\s+(?:un\s+)?(?:raspuns\s+)?"
+        r"(?:vocal|audio|voce|voice)"
+        r"|nu\s+(?:vreau|doresc|genera\w*|reda\w*)[^\n.!?]{0,40}"
+        r"(?:vocal|audio|voce)"
+        r")\b",
+        folded,
+    )
+    if speech_intent and not speech_denial:
+        delivery = "speech_document" if delivery == "document" else "speech"
+
+    if re.search(
+        r"\b(?:bullet points?|bullet(?:-uri)?|bullets?|lista cu puncte)\b",
+        folded,
+    ):
+        response_format = "bullet_list"
+    elif re.search(r"\b(?:tabel|table)\b", folded):
+        response_format = "table"
+    elif re.search(r"\b(?:rezumat executiv|executive summary)\b", folded):
+        response_format = "executive_summary"
+    elif re.search(r"\b(?:raport tehnic|technical report)\b", folded):
+        response_format = "technical_report"
+    elif re.search(r"\b(?:plain text|text simplu|format simplu)\b", folded):
+        response_format = "plain"
+    elif re.search(r"\b(?:markdown|format md)\b", folded):
+        response_format = "markdown"
+    elif re.search(
+        r"\b(?:raspuns|raspund\w*|answer|output)\s+(?:in\s+)?json\b",
+        folded,
+    ):
+        response_format = "json"
+    elif requested_kind == "json" and delivery == "document":
+        response_format = "json"
+    elif requested_kind == "md" and delivery == "document":
+        response_format = "markdown"
+
+    return delivery, document_type, response_format
+
+
+def speech_text(answer: str) -> str:
+    """Remove visual citation markers that should not be spoken by TTS."""
+    cleaned = NUMERIC_CITATION.sub("", answer)
+    cleaned = re.sub(r"[ \t]+([,.;:!?])", r"\1", cleaned)
+    cleaned = re.sub(r"[ \t]{2,}", " ", cleaned)
+    return cleaned.strip()
 
 
 def render(
@@ -420,6 +538,54 @@ async def chat_session_delete(session_id: str) -> JSONResponse:
         return JSONResponse({"detail": exc.message}, status_code=exc.status_code or 502)
 
 
+@app.get("/chat/sources/{source}")
+async def chat_source(source: str) -> JSONResponse:
+    try:
+        return JSONResponse(await rag_api.source(source))
+    except BackendError as exc:
+        return JSONResponse({"detail": exc.message}, status_code=exc.status_code or 502)
+
+
+@app.get("/chat/sources/{source}/download")
+async def chat_source_download(source: str, format: str = "md") -> Response:
+    document_format = format.casefold()
+    if document_format not in {"md", "txt", "pdf", "docx"}:
+        return Response("Invalid source document format.", status_code=422)
+    try:
+        document = await rag_api.source(source)
+        if document_format in {"md", "txt"}:
+            content = str(document["content"]).encode("utf-8")
+            media_type = (
+                "text/markdown; charset=utf-8"
+                if document_format == "md"
+                else "text/plain; charset=utf-8"
+            )
+            filename = f"{source}.{document_format}"
+        else:
+            generated = generate_document(
+                document_format,
+                str(document["content"]),
+                {
+                    "title": document.get("title"),
+                    "source": source,
+                },
+                filename_stem=source,
+            )
+            content = generated.content
+            media_type = generated.media_type
+            filename = generated.filename
+        return Response(
+            content=content,
+            media_type=media_type,
+            headers={
+                "Content-Disposition": f'attachment; filename="{filename}"',
+                "Cache-Control": "private, max-age=3600",
+            },
+        )
+    except BackendError as exc:
+        return Response(exc.message, status_code=exc.status_code or 502)
+
+
 @app.post("/chat/message")
 async def chat_message(
     message: str = Form(min_length=1),
@@ -434,11 +600,43 @@ async def chat_message(
     top_k: int = Form(default=3, ge=1, le=50),
     delivery: str = Form(default="conversation"),
     document_type: str = Form(default="pdf"),
+    apply_agent: bool = Form(default=False),
+    apply_agent_mode: bool = Form(default=False),
+    apply_response_format: bool = Form(default=False),
+    apply_delivery: bool = Form(default=False),
+    apply_document_type: bool = Form(default=False),
+    apply_top_k: bool = Form(default=False),
+    generation_id: str | None = Form(default=None),
     attachment: UploadFile | None = File(default=None),
 ) -> JSONResponse:
-    if delivery not in {"conversation", "speech", "document"}:
+    session_id = (
+        session_id.strip()
+        if isinstance(session_id, str) and session_id.strip()
+        else None
+    )
+    agent_value = agent if apply_agent is True else None
+    agent_mode_value = agent_mode if apply_agent_mode is True else None
+    top_k_value = top_k if apply_top_k is True else None
+    response_format = (
+        response_format if apply_response_format is True else "plain"
+    )
+    delivery = (
+        delivery
+        if apply_delivery is True
+        else ("document" if apply_document_type is True else "conversation")
+    )
+    document_type = document_type if apply_document_type is True else "pdf"
+    delivery, document_type, response_format = infer_document_request(
+        message,
+        delivery,
+        document_type,
+        response_format,
+    )
+    if delivery not in {"conversation", "speech", "document", "speech_document"}:
         return JSONResponse({"detail": "Invalid delivery option."}, status_code=422)
-    if delivery == "document" and document_type not in {"pdf", "docx", "txt", "md", "json"}:
+    if delivery in {"document", "speech_document"} and document_type not in {
+        "pdf", "docx", "pptx", "txt", "md", "json",
+    }:
         return JSONResponse({"detail": "Invalid document type."}, status_code=422)
 
     try:
@@ -454,6 +652,21 @@ async def chat_message(
         ]
     except (ValueError, TypeError, KeyError):
         return JSONResponse({"detail": "Invalid conversation history."}, status_code=422)
+
+    if session_id:
+        try:
+            try:
+                await rag_api.session(session_id)
+            except BackendError as exc:
+                if exc.status_code != 404:
+                    raise
+                replacement = await rag_api.create_session()
+                session_id = str(replacement["session_id"])
+        except BackendError as exc:
+            return JSONResponse(
+                {"detail": exc.message},
+                status_code=exc.status_code or 502,
+            )
 
     extracted = None
     if attachment and attachment.filename:
@@ -471,13 +684,14 @@ async def chat_message(
                 status_code=exc.status_code or 502,
             )
 
-    try:
-        result = await rag_api.ask(
+    generation_id = generation_id or uuid4().hex
+    generation_task = asyncio.create_task(
+        rag_api.ask(
             message.strip(),
             use_rag,
-            top_k,
-            agent,
-            agent_mode,
+            top_k_value,
+            agent_value,
+            agent_mode_value,
             fact_check,
             response_format,
             extracted["text"] if extracted else None,
@@ -486,21 +700,28 @@ async def chat_message(
             session_id=session_id,
             shared_memory=shared_memory,
             document_path=extracted.get("saved_path") if extracted else None,
+            generation_id=generation_id,
+            delivery=delivery,
+            document_type=document_type,
         )
-        artifact = None
-        if delivery == "speech":
-            audio = await rag_api.speak(result["answer"])
+    )
+    active_chat_generations[generation_id] = generation_task
+    try:
+        result = await generation_task
+        artifacts = []
+        if delivery in {"speech", "speech_document"}:
+            audio = await rag_api.speak(speech_text(result["answer"]))
             artifact_id = artifact_store.put(
                 audio,
                 "audio/wav",
                 "libra-assist-answer.wav",
             )
-            artifact = {
+            artifacts.append({
                 "kind": "speech",
                 "url": f"/chat/artifacts/{artifact_id}",
                 "filename": "libra-assist-answer.wav",
-            }
-        elif delivery == "document":
+            })
+        if delivery in {"document", "speech_document"}:
             generated = generate_document(
                 document_type,
                 result["answer"],
@@ -516,11 +737,12 @@ async def chat_message(
                 generated.media_type,
                 generated.filename,
             )
-            artifact = {
+            artifacts.append({
                 "kind": "document",
                 "url": f"/chat/artifacts/{artifact_id}",
                 "filename": generated.filename,
-            }
+            })
+        artifact = artifacts[0] if artifacts else None
         return JSONResponse({
             "answer": result["answer"],
             "agent": result.get("agent"),
@@ -528,6 +750,7 @@ async def chat_message(
             "model": result.get("model"),
             "usage": result.get("usage"),
             "fact_check": result.get("fact_check"),
+            "guardrail": result.get("guardrail"),
             "augmented": result.get("augmented", False),
             "sources": result.get("retrieved", []),
             "response_format": result.get("response_format"),
@@ -540,9 +763,15 @@ async def chat_message(
                 if extracted else None
             ),
             "artifact": artifact,
+            "artifacts": artifacts,
             "session_id": result.get("session_id"),
             "memory": result.get("memory"),
         })
+    except asyncio.CancelledError:
+        return JSONResponse(
+            {"detail": "Generation cancelled by the user.", "cancelled": True},
+            status_code=409,
+        )
     except BackendError as exc:
         return JSONResponse(
             {"detail": exc.message},
@@ -550,6 +779,26 @@ async def chat_message(
         )
     except ValueError as exc:
         return JSONResponse({"detail": str(exc)}, status_code=422)
+    finally:
+        if active_chat_generations.get(generation_id) is generation_task:
+            active_chat_generations.pop(generation_id, None)
+
+
+@app.post("/chat/generations/{generation_id}/cancel")
+async def chat_generation_cancel(generation_id: str) -> JSONResponse:
+    task = active_chat_generations.get(generation_id)
+    try:
+        result = await rag_api.cancel_generation(generation_id)
+    except BackendError as exc:
+        if task is not None and not task.done():
+            task.cancel()
+        return JSONResponse(
+            {"detail": exc.message},
+            status_code=exc.status_code or 502,
+        )
+    if task is not None and not task.done():
+        task.cancel()
+    return JSONResponse({**result, "frontend_cancelled": task is not None})
 
 
 @app.get("/chat/artifacts/{artifact_id}")
@@ -557,11 +806,18 @@ async def chat_artifact(artifact_id: str) -> Response:
     artifact = artifact_store.get(artifact_id)
     if artifact is None:
         return Response("Artifact not found or expired.", status_code=404)
+    disposition = (
+        "inline"
+        if artifact.media_type.casefold().startswith("audio/")
+        else "attachment"
+    )
     return Response(
         content=artifact.content,
         media_type=artifact.media_type,
         headers={
-            "Content-Disposition": f'inline; filename="{artifact.filename}"',
+            "Content-Disposition": (
+                f'{disposition}; filename="{artifact.filename}"'
+            ),
             "Cache-Control": "private, max-age=3600",
         },
     )

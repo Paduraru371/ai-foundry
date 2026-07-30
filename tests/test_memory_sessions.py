@@ -54,6 +54,27 @@ class SessionMemoryTests(unittest.TestCase):
         )
         self.assertIsNone(self.store.compaction_payload(session_id, keep=2))
 
+    def test_compaction_waits_for_a_useful_batch(self) -> None:
+        session_id = self.store.create()["session_id"]
+        for content in ("One", "Two", "Three", "Four"):
+            self.store.add_message(session_id, "user", content)
+
+        self.assertIsNone(
+            self.store.compaction_payload(
+                session_id,
+                keep=2,
+                min_new_messages=3,
+            )
+        )
+        self.store.add_message(session_id, "assistant", "Five")
+
+        payload = self.store.compaction_payload(
+            session_id,
+            keep=2,
+            min_new_messages=3,
+        )
+        self.assertEqual(len(payload["messages"]), 3)
+
     def test_shared_memory_is_ranked_by_current_query(self) -> None:
         current = self.store.create("Current")["session_id"]
         python_session = self.store.create("Python interview")["session_id"]

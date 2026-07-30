@@ -46,7 +46,13 @@ preflight input estimates, the configured output ceiling, and an estimated
 Azure GPT-5-mini input/output cost. Pricing values are configurable in `.env`.
 
 The Chat page stores the visible conversation in browser `localStorage` and sends
-the latest turns back to `/ask` as bounded history. Each answer can stay in the
-conversation, become playable WAV speech, or be downloaded as PDF, DOCX, TXT,
-Markdown, or JSON. Generated files/audio are kept in a bounded in-memory store
-for one hour.
+the latest turns back to `/ask` as bounded history. Optional Answer settings have
+an explicit checkbox; changing a value enables its checkbox. Unchecked settings
+do not override the backend defaults, and natural-language delivery/format
+instructions in the message take priority over checked controls. Each answer can
+stay in the conversation, become playable WAV speech, or be downloaded as PDF,
+DOCX, PPTX, TXT, Markdown or JSON. While an answer is running, **Stop generating** cancels the
+browser request and tells the backend to discard the generation before it is
+persisted. **New chat** cancels any active generation and opens an empty backend
+session while retaining completed sessions in the selector.
+Generated files/audio are kept in a bounded in-memory store for one hour.

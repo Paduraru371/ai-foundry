@@ -1,6 +1,9 @@
 """Agent execution endpoint, with optional retrieval augmentation."""
 from __future__ import annotations
 
+import re
+import unicodedata
+
 from fastapi import APIRouter, HTTPException
 
 from ...agents import foundry_agent, local_agent
@@ -17,11 +20,16 @@ from ...schemas import (
     SearchHit,
     Usage,
 )
-from ...services import fact_check
+from ...services import fact_check, grounding_guardrails
+from ...services.generation_control import (
+    GenerationCancelled,
+    generation_control,
+)
 from ..dependencies import require_qdrant, retrieve, store
 
 router = APIRouter()
 NO_RELEVANT_CONTEXT = "Nothing relevant was found in the knowledge base."
+NUMERIC_CITATION = re.compile(r"\[\s*(\d+)\s*\]")
 
 FORMAT_INSTRUCTIONS = {
     "plain": "Use clear plain text.",
@@ -41,6 +49,94 @@ FORMAT_INSTRUCTIONS = {
         "Risks/limitations, and Recommendations."
     ),
 }
+DOCUMENT_QUESTION_PATTERN = re.compile(
+    r"(?:^|\n|(?<=\?))\s*(?:\d+\s*[.)]\s*)?([^\n?]{8,500}\?)",
+    re.MULTILINE,
+)
+
+
+def _fold_text(value: str) -> str:
+    return "".join(
+        character
+        for character in unicodedata.normalize("NFKD", value.casefold())
+        if not unicodedata.combining(character)
+    )
+
+
+def _unsupported_answer(question: str, persona_name: str, threshold: float) -> str:
+    if persona_name != "motrun-onboarding":
+        return f"{NO_RELEVANT_CONTEXT} Minimum score: {threshold:.2f}."
+    words = set(re.findall(r"[a-z]+", _fold_text(question)))
+    romanian = bool(words & {
+        "care", "ce", "cum", "este", "sunt", "pentru", "vreau", "pot",
+        "documente", "cont", "client", "firma", "onboarding",
+    })
+    if romanian:
+        return (
+            "Pentru un răspuns sigur și aplicabil situației tale, cazul trebuie "
+            "confirmat de un coleg al băncii. Te rog să contactezi echipa relevantă "
+            "sau să mergi într-o sucursală, folosind datele oficiale de contact ale băncii."
+        )
+    return (
+        "For a reliable answer that applies to your situation, the case needs "
+        "confirmation by a bank employee. Please contact the relevant team or visit "
+        "a branch, using the bank's official contact details."
+    )
+
+
+def _apply_grounding_guardrail(
+    question: str,
+    answer: str,
+    persona_name: str,
+    retrieved_count: int,
+) -> tuple[str, dict | None]:
+    """Reject uncited or impossible citations for the regulated persona."""
+    if persona_name != "motrun-onboarding" or retrieved_count <= 0:
+        return answer, None
+    citations = [
+        int(match.group(1))
+        for match in NUMERIC_CITATION.finditer(answer)
+    ]
+    folded = _fold_text(answer)
+    handoff = any(phrase in folded for phrase in (
+        "angajat al bancii",
+        "echipa relevanta",
+        "o sucursala",
+        "bank employee",
+        "relevant team",
+        "visit a branch",
+        "needs confirmation",
+        "trebuie confirmat",
+    ))
+    invalid = sorted({
+        citation
+        for citation in citations
+        if citation < 1 or citation > retrieved_count
+    })
+    if invalid:
+        return (
+            _unsupported_answer(
+                question,
+                persona_name,
+                settings.retrieval_score_threshold,
+            ),
+            {
+                "status": "handoff",
+                "reason": "invalid_citation",
+                "invalid_citations": invalid,
+            },
+        )
+    if not citations and not handoff:
+        return answer, {
+            "status": "review_required",
+            "reason": "missing_grounding_citations",
+            "citations": [],
+        }
+    return answer, {
+        "status": "passed",
+        "reason": "valid_citations" if citations else "managed_handoff",
+        "citations": sorted(set(citations)),
+    }
 
 
 def _analysis_task(
@@ -84,6 +180,30 @@ def _analysis_task(
             f"{req.document_text.strip()}\n"
             "</document>"
         )
+        if _document_questions(req.document_text):
+            parts.append(
+                "ATTACHED-QUESTION MODE:\n"
+                "The attached document contains questions to answer; it is task input, "
+                "not banking evidence. Answer each question directly from relevant "
+                "retrieved passages. Never fill a missing answer with an unrelated fact. "
+                "For an unsupported question, use one concise same-language sentence "
+                "saying that reliable information is insufficient and that a bank "
+                "employee should be contacted."
+            )
+    if req.delivery in {"document", "speech_document"}:
+        parts.append(
+            "DOCUMENT DELIVERY:\n"
+            "The application will create and attach the requested document automatically. "
+            "Write the final document content now. Do not ask the user to confirm a "
+            "filename, language, format or permission, and do not merely offer to create it."
+        )
+    if req.delivery in {"speech", "speech_document"}:
+        parts.append(
+            "SPEECH DELIVERY:\n"
+            "The application will synthesize and play the final answer automatically. "
+            "Provide the actual answer now. Never say that you cannot create or play audio, "
+            "never tell the user to use local TTS, and do not discuss TTS limitations."
+        )
     parts.append("REQUIRED OUTPUT FORMAT:\n" + FORMAT_INSTRUCTIONS[req.response_format])
     return "\n\n".join(parts)
 
@@ -91,10 +211,35 @@ def _analysis_task(
 @router.post("/ask", response_model=AskResponse, tags=["4 · generation"])
 def ask(req: AskRequest) -> AskResponse:
     """Run the selected agent, optionally augmented with retrieved context."""
+    try:
+        with generation_control.track(req.generation_id) as cancellation:
+            return _run_generation(req, cancellation)
+    except GenerationCancelled as error:
+        raise HTTPException(status_code=409, detail=str(error)) from error
+
+
+@router.post(
+    "/generations/{generation_id}/cancel",
+    tags=["4 · generation"],
+)
+def generation_cancel(generation_id: str) -> dict[str, str | bool]:
+    if not 8 <= len(generation_id) <= 64 or not all(
+        character.isalnum() or character in "_-"
+        for character in generation_id
+    ):
+        raise HTTPException(status_code=422, detail="Invalid generation id.")
+    return {
+        "generation_id": generation_id,
+        "cancelled": generation_control.cancel(generation_id),
+    }
+
+
+def _run_generation(req: AskRequest, cancellation=None) -> AskResponse:
     retrieved: list[SearchHit] = []
     rerank_result = None
     persona_name = req.agent or settings.agent_persona
     mode_requested = (req.agent_mode or settings.agent_mode).lower()
+    generation_control.checkpoint(cancellation)
     try:
         context = memory_service.prepare(
             req.session_id,
@@ -103,6 +248,7 @@ def ask(req: AskRequest) -> AskResponse:
         )
     except ValueError as error:
         raise HTTPException(status_code=404, detail=str(error))
+    generation_control.checkpoint(cancellation)
     task = _analysis_task(req, context)
     persona = None
     hosted_only = None
@@ -118,6 +264,7 @@ def ask(req: AskRequest) -> AskResponse:
         if not hosted_only:
             raise HTTPException(status_code=404, detail=str(error))
 
+    generation_control.checkpoint(cancellation)
     if req.use_rag:
         require_qdrant()
         if not store.info()["exists"]:
@@ -127,15 +274,28 @@ def ask(req: AskRequest) -> AskResponse:
                        "or set use_rag=false for a plain LLM answer.",
             )
         top_k = req.top_k or settings.top_k
-        retrieval_query = _retrieval_query(req.question, context.history)
-        candidates = retrieve(
-            retrieval_query,
-            max(10, top_k),
-            req.min_score,
+        retrieval_queries = _retrieval_queries(
+            req.question,
+            context.history,
+            req.document_text,
         )
+        retrieval_query = "\n".join(retrieval_queries)
+        candidate_by_id: dict[str, dict] = {}
+        for query in retrieval_queries:
+            for hit in retrieve(query, max(10, top_k), req.min_score):
+                previous = candidate_by_id.get(hit["id"])
+                if previous is None or hit["score"] > previous["score"]:
+                    candidate_by_id[hit["id"]] = hit
+        candidates = sorted(
+            candidate_by_id.values(),
+            key=lambda hit: hit["score"],
+            reverse=True,
+        )[:50]
+        generation_control.checkpoint(cancellation)
         ranked, rerank_result = rerank_with_llm(
             retrieval_query, candidates, top_k, return_usage=True
         )
+        generation_control.checkpoint(cancellation)
         retrieved = [
             SearchHit(**hit)
             for hit in ranked
@@ -176,7 +336,8 @@ def ask(req: AskRequest) -> AskResponse:
                 top_k,
             )
             usage = _combine_usage({"rerank": rerank_usage})
-            answer = f"{NO_RELEVANT_CONTEXT} Minimum score: {threshold:.2f}."
+            answer = _unsupported_answer(req.question, persona_name, threshold)
+            generation_control.checkpoint(cancellation)
             recorded = _record_turn(req, answer)
             if recorded and recorded.compaction_result:
                 memory_usage = _result_usage(
@@ -190,6 +351,7 @@ def ask(req: AskRequest) -> AskResponse:
                     "rerank": rerank_usage,
                     "memory_compaction": memory_usage,
                 })
+            memory_info = _memory_info(context, recorded)
             if recorded:
                 memory_service.set_turn_metadata(
                     recorded.assistant_message_id,
@@ -199,6 +361,11 @@ def ask(req: AskRequest) -> AskResponse:
                         "model": "score-threshold",
                         "augmented": True,
                         "sources": [],
+                        "guardrail": {
+                            "status": "handoff",
+                            "reason": "no_relevant_context",
+                        },
+                        "memory": memory_info.model_dump(),
                     },
                 )
             return AskResponse(
@@ -213,11 +380,16 @@ def ask(req: AskRequest) -> AskResponse:
                 usage=Usage(**usage),
                 response_format=req.response_format,
                 document_name=req.document_name,
+                guardrail={
+                    "status": "handoff",
+                    "reason": "no_relevant_context",
+                },
                 session_id=req.session_id,
-                memory=_memory_info(context, recorded),
+                memory=memory_info,
             )
 
     chunks = [hit.model_dump() for hit in retrieved]
+    generation_control.checkpoint(cancellation)
     try:
         if hosted_only is not None:
             reply = foundry_agent.run_hosted(hosted_only, task, chunks)
@@ -238,10 +410,41 @@ def ask(req: AskRequest) -> AskResponse:
             detail=f"Agent run failed (mode={mode_requested}, "
                    f"provider={settings.llm_provider}): {error}",
         )
+    generation_control.checkpoint(cancellation)
     answer = reply.text.strip() or (
         "The assistant returned no text. No answer can be shown for this request; "
         "please retry or select another agent."
     )
+    answer, guardrail = _apply_grounding_guardrail(
+        req.question,
+        answer,
+        persona_name,
+        len(retrieved),
+    )
+    guardrail_review_result = None
+    guardrail_estimated_prompt_tokens = 0
+    if (
+        persona_name == "motrun-onboarding"
+        and retrieved
+        and guardrail is not None
+        and guardrail.get("status") in {"passed", "review_required"}
+    ):
+        generation_control.checkpoint(cancellation)
+        review = grounding_guardrails.review(
+            req.question,
+            answer,
+            chunks,
+            _unsupported_answer(
+                req.question,
+                persona_name,
+                settings.retrieval_score_threshold,
+            ),
+        )
+        answer = review.answer
+        guardrail = {**guardrail, **review.details}
+        guardrail_review_result = review.result
+        guardrail_estimated_prompt_tokens = review.estimated_prompt_tokens
+        generation_control.checkpoint(cancellation)
 
     info = (
         AgentInfo(
@@ -280,14 +483,33 @@ def ask(req: AskRequest) -> AskResponse:
     )
     rerank_usage = _rerank_usage(
         rerank_result,
-        _retrieval_query(req.question, context.history),
+        (
+            "\n".join(_retrieval_queries(
+                req.question,
+                context.history,
+                req.document_text,
+            ))
+            if req.use_rag else req.question
+        ),
         candidates if req.use_rag else [],
         top_k if req.use_rag else 0,
     )
+    generation_control.checkpoint(cancellation)
     verification = fact_check.verify(req.question, answer) if req.fact_check else None
+    generation_control.checkpoint(cancellation)
     phases = {"answer": answer_usage, "rerank": rerank_usage}
+    if guardrail_review_result is not None:
+        phases["grounding_guardrail"] = _result_usage(
+            guardrail_review_result,
+            estimated_prompt_tokens=guardrail_estimated_prompt_tokens,
+            estimated_max_completion_tokens=(
+                settings.grounding_guardrail_max_tokens
+            ),
+        )
     if verification and verification.get("usage"):
         phases["fact_check"] = verification["usage"]
+    generation_control.checkpoint(cancellation)
+    # Commit boundary: cancelled answers never enter persistent session memory.
     recorded = _record_turn(req, answer)
     if recorded and recorded.compaction_result:
         phases["memory_compaction"] = _result_usage(
@@ -296,6 +518,7 @@ def ask(req: AskRequest) -> AskResponse:
             estimated_max_completion_tokens=700,
         )
     usage = _combine_usage(phases)
+    memory_info = _memory_info(context, recorded)
     if recorded:
         memory_service.set_turn_metadata(
             recorded.assistant_message_id,
@@ -305,8 +528,10 @@ def ask(req: AskRequest) -> AskResponse:
                 "model": reply.model,
                 "agent": info.display_name,
                 "fact_check": verification,
+                "guardrail": guardrail,
                 "augmented": req.use_rag,
                 "sources": [hit.model_dump() for hit in retrieved],
+                "memory": memory_info.model_dump(),
             },
         )
     return AskResponse(
@@ -322,8 +547,9 @@ def ask(req: AskRequest) -> AskResponse:
         response_format=req.response_format,
         document_name=req.document_name,
         fact_check=verification,
+        guardrail=guardrail,
         session_id=req.session_id,
-        memory=_memory_info(context, recorded),
+        memory=memory_info,
     )
 
 
@@ -461,3 +687,30 @@ def _retrieval_query(
         f"{query}\nPrevious user topic: {previous_user[:800]}"
         if previous_user else query
     )
+
+
+def _document_questions(document_text: str | None) -> list[str]:
+    if not document_text:
+        return []
+    questions: list[str] = []
+    for match in DOCUMENT_QUESTION_PATTERN.finditer(document_text):
+        question = " ".join(match.group(1).split())
+        if question and question not in questions:
+            questions.append(question)
+        if len(questions) == 8:
+            break
+    return questions
+
+
+def _retrieval_queries(
+    question: str,
+    history: list[dict[str, str]],
+    document_text: str | None = None,
+) -> list[str]:
+    """Use actual questions extracted from an attachment as retrieval queries."""
+    base = _retrieval_query(question, history)
+    result = [base]
+    for attached_question in _document_questions(document_text):
+        if attached_question.casefold() not in base.casefold():
+            result.append(attached_question)
+    return result

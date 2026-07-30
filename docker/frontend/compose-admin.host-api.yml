@@ -1,4 +1,4 @@
 services:
   frontend-admin:
     environment:
-      BACKEND_URL: http://host.docker.internal:7799
+      BACKEND_URL: http://host.docker.internal:${HOST_API_PORT:-7799}

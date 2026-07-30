@@ -25,17 +25,25 @@ class Persona:
     display_name: str
     description: str
     instructions: str                      # the heart: the system prompt body
+    policy: str = ""                       # optional sibling <persona>.md
     style_rules: list[str] = field(default_factory=list)
     temperature: float | None = None       # overrides the request/env default
     max_tokens: int | None = None
     require_citations: bool = True         # when grounded, demand [1] [2] markers
     refuse_when_unsupported: bool = True   # when grounded, forbid guessing
+    unsupported_response: str | None = None
     reasoning_effort: str | None = None    # gpt-5 family: minimal | low | medium | high
     tools: list[str] = field(default_factory=list)   # names only — see /agents
 
     # ---- the composition step: JSON -> the system prompt actually sent -------
     def system_prompt(self, *, grounded: bool) -> str:
         parts = [self.instructions.strip()]
+
+        if self.policy:
+            parts.append(
+                "Operational guardrail and refusal policy:\n"
+                + self.policy.strip()
+            )
 
         if self.style_rules:
             rules = "\n".join(f"- {r}" for r in self.style_rules)
@@ -51,10 +59,10 @@ class Persona:
             if self.require_citations:
                 grounding.append("Cite the passages you use as [1], [2], … .")
             if self.refuse_when_unsupported:
-                grounding.append(
+                grounding.append(self.unsupported_response or (
                     "If the passages do not contain what is needed, say so explicitly "
                     "instead of inventing an answer."
-                )
+                ))
             parts.append(" ".join(grounding))
 
         return "\n\n".join(parts)
@@ -64,11 +72,13 @@ class Persona:
             "name": self.name,
             "display_name": self.display_name,
             "description": self.description,
+            "policy_file": f"{self.name}.md" if self.policy else None,
             "temperature": self.temperature,
             "max_tokens": self.max_tokens,
             "style_rules": self.style_rules,
             "require_citations": self.require_citations,
             "refuse_when_unsupported": self.refuse_when_unsupported,
+            "unsupported_response": self.unsupported_response,
             "reasoning_effort": self.reasoning_effort,
             "tools": self.tools,
         }
@@ -85,21 +95,27 @@ class PersonaNotFound(Exception):
 
 
 # mtime-keyed cache: edits on disk are picked up instantly, re-reads are cheap
-_cache: dict[str, tuple[float, Persona]] = {}
+_cache: dict[str, tuple[tuple[float, float], Persona]] = {}
 
 
 def _parse(path: Path) -> Persona:
     raw = json.loads(path.read_text(encoding="utf-8"))
+    policy_path = path.with_suffix(".md")
     return Persona(
         name=path.stem,
         display_name=raw.get("display_name", path.stem),
         description=raw.get("description", ""),
         instructions=raw.get("instructions", ""),
+        policy=(
+            policy_path.read_text(encoding="utf-8")
+            if policy_path.exists() else ""
+        ),
         style_rules=raw.get("style_rules", []),
         temperature=raw.get("temperature"),
         max_tokens=raw.get("max_tokens"),
         require_citations=raw.get("require_citations", True),
         refuse_when_unsupported=raw.get("refuse_when_unsupported", True),
+        unsupported_response=raw.get("unsupported_response"),
         reasoning_effort=raw.get("reasoning_effort"),
         tools=raw.get("tools", []),
     )
@@ -114,7 +130,11 @@ def load_persona(name: str) -> Persona:
     if not path.exists():
         raise PersonaNotFound(name, available_names())
 
-    mtime = path.stat().st_mtime
+    policy_path = path.with_suffix(".md")
+    mtime = (
+        path.stat().st_mtime,
+        policy_path.stat().st_mtime if policy_path.exists() else 0.0,
+    )
     cached = _cache.get(name)
     if cached and cached[0] == mtime:
         return cached[1]                    # unchanged on disk

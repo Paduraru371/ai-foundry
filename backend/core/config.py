@@ -35,6 +35,9 @@ class Settings(BaseSettings):
     retrieval_vector_weight: float = 0.75
     retrieval_duplicate_threshold: float = 0.82
     retrieval_max_per_source: int = 2
+    grounding_guardrail_llm_enabled: bool = True
+    grounding_guardrail_fail_closed: bool = False
+    grounding_guardrail_max_tokens: int = 900
     llm_temperature: float = 0.2
     llm_max_tokens: int = 2500   # reasoning models spend part of this budget thinking
     max_upload_bytes: int = 20 * 1024 * 1024
@@ -46,14 +49,19 @@ class Settings(BaseSettings):
     history_max_messages: int = 16
     history_max_tokens: int = 10_000
     session_summary_max_chars: int = 4_000
+    session_compaction_batch_messages: int = 4
     shared_memory_max_chars: int = 5_000
     shared_memory_session_limit: int = 4
-    shared_memory_candidate_limit: int = 12
+    shared_memory_candidate_limit: int = 24
     shared_memory_min_score: float = 0.18
+    shared_memory_lexical_override: float = 0.20
 
     # --- provider selection --------------------------------------------------
     llm_provider: str = "openai"            # lmstudio | openai | anthropic | azure
     embedding_provider: str = "openai"      # lmstudio | openai | azure  (Anthropic has no embeddings API)
+    embedding_cache_enabled: bool = True
+    embedding_cache_path: str = str(PROJECT_ROOT / "runtime" / "embedding_cache.sqlite3")
+    embedding_cache_max_entries: int = 20_000
 
     # --- agents ---------------------------------------------------------------
     agent_mode: str = "local"               # local (runs here) | foundry (hosted by Azure)

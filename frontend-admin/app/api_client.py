@@ -78,13 +78,27 @@ class RagApiClient:
     async def search(self, query: str, top_k: int) -> dict[str, Any]:
         return await self._request("POST", "/search", {"query": query, "top_k": top_k})
 
+    async def source(self, source: str) -> dict[str, Any]:
+        return await self._request(
+            "GET",
+            f"/sources/{quote(source, safe='')}",
+        )
+
+    async def source_download(self, source: str) -> bytes:
+        result = await self._request(
+            "GET",
+            f"/sources/{quote(source, safe='')}/download",
+            raw=True,
+        )
+        return bytes(result)
+
     async def ask(
         self,
         question: str,
         use_rag: bool,
-        top_k: int,
-        agent: str = "default",
-        agent_mode: str = "local",
+        top_k: int | None,
+        agent: str | None = None,
+        agent_mode: str | None = None,
         fact_check: bool = False,
         response_format: str = "plain",
         document_text: str | None = None,
@@ -93,6 +107,9 @@ class RagApiClient:
         session_id: str | None = None,
         shared_memory: bool = True,
         document_path: str | None = None,
+        generation_id: str | None = None,
+        delivery: str = "conversation",
+        document_type: str = "pdf",
     ) -> dict[str, Any]:
         return await self._request(
             "POST",
@@ -111,7 +128,16 @@ class RagApiClient:
                 "history": history or [],
                 "session_id": session_id,
                 "shared_memory": shared_memory,
+                "generation_id": generation_id,
+                "delivery": delivery,
+                "document_type": document_type,
             },
+        )
+
+    async def cancel_generation(self, generation_id: str) -> dict[str, Any]:
+        return await self._request(
+            "POST",
+            f"/generations/{quote(generation_id, safe='')}/cancel",
         )
 
     async def sessions(self) -> list[dict[str, Any]]:

@@ -151,7 +151,10 @@ class MemoryService:
             semantic_score = semantic[index] if semantic is not None else lexical
             recency = 1.0 - index / max(1, len(candidates))
             score = 0.78 * semantic_score + 0.17 * lexical + 0.05 * recency
-            if score >= settings.shared_memory_min_score or lexical > 0:
+            if (
+                score >= settings.shared_memory_min_score
+                or lexical >= settings.shared_memory_lexical_override
+            ):
                 ranked.append((score, candidate))
         ranked.sort(key=lambda item: item[0], reverse=True)
 
@@ -184,6 +187,7 @@ class MemoryService:
         payload = session_store.compaction_payload(
             session_id,
             settings.history_max_messages,
+            settings.session_compaction_batch_messages,
         )
         if payload is None:
             return RecordedTurn(assistant_id)

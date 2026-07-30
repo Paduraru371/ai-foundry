@@ -34,6 +34,7 @@ def health() -> Health:
                 "openai": settings.openai_embedding_model,
                 "azure": settings.azure_ai_embedding_deployment,
             }.get(settings.embedding_provider, "?"),
+            "persistent_cache": settings.embedding_cache_enabled,
         },
         agents={
             "mode": settings.agent_mode,
@@ -73,10 +74,25 @@ def config() -> dict:
             "collection": settings.qdrant_collection,
             "qdrant_url": settings.qdrant_url,
         },
+        "embeddings": {
+            "provider": settings.embedding_provider,
+            "persistent_cache": settings.embedding_cache_enabled,
+            "cache_path": settings.embedding_cache_path,
+            "cache_max_entries": settings.embedding_cache_max_entries,
+        },
         "generation": {
             "provider": settings.llm_provider,
             "temperature": settings.llm_temperature,
             "max_tokens": settings.llm_max_tokens,
+            "grounding_guardrail_llm_enabled": (
+                settings.grounding_guardrail_llm_enabled
+            ),
+            "grounding_guardrail_fail_closed": (
+                settings.grounding_guardrail_fail_closed
+            ),
+            "grounding_guardrail_max_tokens": (
+                settings.grounding_guardrail_max_tokens
+            ),
         },
         "documents": {
             "max_upload_bytes": settings.max_upload_bytes,
@@ -88,9 +104,16 @@ def config() -> dict:
             "history_max_messages": settings.history_max_messages,
             "history_max_tokens": settings.history_max_tokens,
             "session_summary_max_chars": settings.session_summary_max_chars,
+            "session_compaction_batch_messages": (
+                settings.session_compaction_batch_messages
+            ),
             "shared_memory_max_chars": settings.shared_memory_max_chars,
             "shared_memory_session_limit": settings.shared_memory_session_limit,
+            "shared_memory_candidate_limit": settings.shared_memory_candidate_limit,
             "shared_memory_min_score": settings.shared_memory_min_score,
+            "shared_memory_lexical_override": (
+                settings.shared_memory_lexical_override
+            ),
             "chat_upload_dir": settings.chat_upload_dir,
         },
         "pricing_estimate": {

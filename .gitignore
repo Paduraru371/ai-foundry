@@ -50,6 +50,7 @@ uploads/*
 !uploads/.gitkeep
 runtime/*
 !runtime/.gitkeep
+.pytest-temp/
 
 # --- local editor/agent tooling state ---
 .claude/

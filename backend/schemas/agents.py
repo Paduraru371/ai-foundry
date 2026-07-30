@@ -49,6 +49,15 @@ class AskRequest(BaseModel):
         "plain", "markdown", "bullet_list", "table", "json",
         "executive_summary", "technical_report",
     ] = Field("plain", description="Shape required for the generated answer")
+    delivery: Literal[
+        "conversation", "speech", "document", "speech_document",
+    ] = Field(
+        "conversation",
+        description="How the frontend will deliver the generated content.",
+    )
+    document_type: Literal[
+        "pdf", "docx", "pptx", "txt", "md", "json",
+    ] = "pdf"
     document_text: Optional[str] = Field(
         None,
         max_length=120_000,
@@ -74,6 +83,13 @@ class AskRequest(BaseModel):
         min_length=8,
         max_length=64,
         description="Persistent backend session. When set, stored history is authoritative.",
+    )
+    generation_id: Optional[str] = Field(
+        None,
+        min_length=8,
+        max_length=64,
+        pattern=r"^[A-Za-z0-9_-]+$",
+        description="Client-generated id used to cancel an in-flight answer.",
     )
     shared_memory: bool = Field(
         True,
@@ -103,11 +119,13 @@ class PersonaSummary(BaseModel):
     name: str
     display_name: str
     description: str
+    policy_file: Optional[str] = None
     temperature: Optional[float] = None
     max_tokens: Optional[int] = None
     style_rules: list[str] = Field(default_factory=list)
     require_citations: bool = True
     refuse_when_unsupported: bool = True
+    unsupported_response: Optional[str] = None
     reasoning_effort: Optional[str] = None
     tools: list[str] = Field(default_factory=list)
     runs_on: Literal["local", "both", "foundry", "unknown"] = Field(
@@ -173,5 +191,6 @@ class AskResponse(BaseModel):
     response_format: str = "plain"
     document_name: Optional[str] = None
     fact_check: Optional[dict] = None
+    guardrail: Optional[dict] = None
     session_id: Optional[str] = None
     memory: Optional[MemoryContextInfo] = None

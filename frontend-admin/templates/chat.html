@@ -3,130 +3,201 @@
 {% block content %}
   <header class="page-heading">
     <div>
-      <span class="eyebrow">Conversational workspace</span>
-      <h1>Chat with Libra Assist</h1>
-      <p>Keep context across turns, attach documents, and choose how each answer is delivered.</p>
-    </div>
-    <div class="chat-session-actions">
-      <label>
-        Saved session
-        <select id="chat-session"></select>
-      </label>
-      <button id="new-chat" class="button secondary" type="button">New session</button>
-      <button id="clear-chat" class="button secondary" type="button">Delete session</button>
+      <h1>LibraBank Online Assistent</h1>
+      <p>Keep in mind that chatbots might do mistakes.</p>
     </div>
   </header>
 
-  <section class="chat-panel">
-    <div id="chat-messages" class="chat-messages" aria-live="polite"></div>
+  <form id="chat-form" class="chat-workspace" enctype="multipart/form-data">
+    <section class="chat-panel">
+      <div id="chat-messages" class="chat-messages" aria-live="polite"></div>
 
-    <form id="chat-form" class="chat-composer" enctype="multipart/form-data">
-      <label>
-        Message or task
-        <span class="chat-input-wrap">
+      <div class="chat-composer">
+        <label>
+          Message or task
           <textarea id="chat-input" name="message" rows="3" required
             placeholder="Ask a follow-up, request an analysis, or attach a document…"></textarea>
-          <button id="chat-record" class="microphone-button" type="button"
-            aria-label="Start microphone" title="Ask using the microphone">●</button>
-        </span>
-      </label>
-      <span id="chat-recording-status" class="field-hint" role="status">
-        Press the microphone to dictate a question with Azure Speech to Text.
-      </span>
-
-      <div class="chat-attachment-row">
-        <label class="grow">
-          Attach document (optional)
-          <input id="chat-file" name="attachment" type="file"
-            accept=".pdf,.doc,.docx,.ppt,.pptx,.txt,.md,.csv,.json,.xml,.yaml,.yml,.html,.htm,.rtf,.log,.py,.js,.ts,.java,.c,.cpp,.sql">
         </label>
-        <span id="chat-file-note" class="field-hint">
-          PDF, DOCX, PPTX and text/code · maximum 20 MB
+
+        <div class="chat-composer-toolbar">
+          <div class="chat-composer-actions">
+            <label class="button secondary chat-upload-button" for="chat-file">
+              Attach document
+              <input id="chat-file" name="attachment" type="file" hidden
+                accept=".pdf,.doc,.docx,.ppt,.pptx,.txt,.md,.csv,.json,.xml,.yaml,.yml,.html,.htm,.rtf,.log,.py,.js,.ts,.java,.c,.cpp,.sql">
+            </label>
+            <button id="chat-record" class="button secondary microphone-button" type="button"
+              aria-label="Start microphone" title="Ask using the microphone">● Microphone</button>
+            <button id="chat-send" class="button primary" type="button">Send message →</button>
+          </div>
+        </div>
+        <div class="chat-composer-notes">
+          <span id="chat-recording-status" class="field-hint" role="status">
+            Press the microphone to dictate a question with Azure Speech to Text.
+          </span>
+          <span id="chat-file-note" class="field-hint">
+            PDF, DOCX, PPTX and text/code · maximum 20 MB
+          </span>
+        </div>
+        <span id="chat-status" class="visually-hidden" role="status">
+          Ready to answer.
         </span>
       </div>
+    </section>
 
-      <div class="chat-settings">
+    <aside class="chat-control-column">
+      <section class="chat-control-card chat-session-panel">
+        <span class="eyebrow">Conversation</span>
         <label>
-          Agent
-          <select id="chat-agent" name="agent">
-            {% for item in agents %}
-              <option value="{{ item.name }}" data-runs-on="{{ item.runs_on }}"
-                {{ 'selected' if agent == item.name else '' }}>{{ item.display_name }}</option>
-            {% endfor %}
-            {% if hosted_only %}
-              <optgroup label="Foundry only">
-                {% for item in hosted_only %}
-                  <option value="{{ item.name }}" data-runs-on="{{ item.runs_on }}"
-                    {{ 'selected' if agent == item.name else '' }}>{{ item.display_name }}</option>
-                {% endfor %}
-              </optgroup>
-            {% endif %}
-          </select>
+          Saved session
+          <select id="chat-session"></select>
         </label>
-        <label>
-          Execution
-          <select id="chat-agent-mode" name="agent_mode">
-            <option value="local" {{ 'selected' if agent_mode == 'local' else '' }}>Local agent</option>
-            <option id="chat-foundry-option" value="foundry"
-              {{ 'selected' if agent_mode == 'foundry' else '' }}>Foundry agent</option>
-          </select>
-        </label>
-        <label>
-          Answer structure
-          <select name="response_format">
-            <option value="plain">Plain text</option>
-            <option value="markdown">Markdown</option>
-            <option value="bullet_list">Bullet list</option>
-            <option value="table">Table</option>
-            <option value="json">JSON</option>
-            <option value="executive_summary">Executive summary</option>
-            <option value="technical_report">Technical report</option>
-          </select>
-        </label>
-        <label>
-          Deliver as
-          <select id="chat-delivery" name="delivery">
-            <option value="conversation">Conversation response</option>
-            <option value="speech">Speech / audio</option>
-            <option value="document">Generated document</option>
-          </select>
-        </label>
-        <label id="chat-document-type" hidden>
-          Document type
-          <select name="document_type">
-            <option value="pdf">PDF</option>
-            <option value="docx">DOCX</option>
-            <option value="txt">TXT</option>
-            <option value="md">Markdown</option>
-            <option value="json">JSON</option>
-          </select>
-        </label>
-        <label class="compact-field">
-          Top K
-          <input name="top_k" type="number" min="1" max="50" value="3">
-        </label>
-        <label class="checkbox chat-check">
-          <input name="use_rag" type="checkbox" value="true" checked>
-          <span><strong>Use RAG</strong><small>Retrieve internal context</small></span>
-        </label>
-        <label class="checkbox chat-check">
-          <input name="shared_memory" type="checkbox" value="true" checked>
-          <span><strong>Shared memory</strong><small>Relevant previous sessions</small></span>
-        </label>
-        <label class="checkbox chat-check">
-          <input name="fact_check" type="checkbox" value="true">
-          <span><strong>Fact-check</strong><small>Verify on the open web</small></span>
-        </label>
-      </div>
+        <div class="chat-session-buttons">
+          <button id="new-chat" class="button secondary" type="button">New chat</button>
+          <button id="clear-chat" class="button danger" type="button">Delete session</button>
+        </div>
+      </section>
 
-      <div class="chat-send-row">
-        <span id="chat-status" class="muted" role="status">
-          Enter sends · Shift+Enter adds a new line
-        </span>
-        <button id="chat-send" class="button primary" type="submit">Send message →</button>
-      </div>
-    </form>
-  </section>
+      <section class="chat-control-card">
+        <span class="eyebrow">Answer settings</span>
+        <p class="chat-settings-hint">
+          Check a setting to enforce it. Changing its value checks it automatically.
+          Instructions written in the message have priority.
+        </p>
+        <div class="chat-settings">
+          <label class="chat-optional-setting" data-optional-setting>
+            <span class="chat-setting-title">
+              Agent
+              <input class="chat-setting-apply" name="apply_agent"
+                type="checkbox" value="true" aria-label="Apply selected agent">
+            </span>
+            <select id="chat-agent" name="agent">
+              {% for item in agents %}
+                <option value="{{ item.name }}" data-runs-on="{{ item.runs_on }}"
+                  {{ 'selected' if agent == item.name else '' }}>{{ item.display_name }}</option>
+              {% endfor %}
+              {% if hosted_only %}
+                <optgroup label="Foundry only">
+                  {% for item in hosted_only %}
+                    <option value="{{ item.name }}" data-runs-on="{{ item.runs_on }}"
+                      {{ 'selected' if agent == item.name else '' }}>{{ item.display_name }}</option>
+                  {% endfor %}
+                </optgroup>
+              {% endif %}
+            </select>
+          </label>
+          <label class="chat-optional-setting" data-optional-setting>
+            <span class="chat-setting-title">
+              Execution
+              <input class="chat-setting-apply" name="apply_agent_mode"
+                type="checkbox" value="true" aria-label="Apply execution mode">
+            </span>
+            <select id="chat-agent-mode" name="agent_mode">
+              <option value="local" {{ 'selected' if agent_mode == 'local' else '' }}>Local agent</option>
+              <option id="chat-foundry-option" value="foundry"
+                {{ 'selected' if agent_mode == 'foundry' else '' }}>Foundry agent</option>
+            </select>
+          </label>
+          <label class="chat-optional-setting" data-optional-setting>
+            <span class="chat-setting-title">
+              Content formatting
+              <input class="chat-setting-apply" name="apply_response_format"
+                type="checkbox" value="true" aria-label="Apply content formatting">
+            </span>
+            <select name="response_format">
+              <option value="plain">Plain text</option>
+              <option value="markdown">Markdown</option>
+              <option value="bullet_list">Bullet list</option>
+              <option value="table">Table</option>
+              <option value="json">JSON</option>
+              <option value="executive_summary">Executive summary</option>
+              <option value="technical_report">Technical report</option>
+            </select>
+          </label>
+          <label id="chat-document-type" class="chat-optional-setting"
+            data-optional-setting>
+            <span class="chat-setting-title">
+              Generated file type
+              <input class="chat-setting-apply" name="apply_document_type"
+                type="checkbox" value="true" aria-label="Apply generated file type">
+            </span>
+            <select name="document_type">
+              <option value="pdf">PDF document (.pdf)</option>
+              <option value="docx">Word document (.docx)</option>
+              <option value="pptx">PowerPoint presentation (.pptx)</option>
+              <option value="txt">Plain text file (.txt)</option>
+              <option value="md">Markdown file (.md)</option>
+              <option value="json">JSON file (.json)</option>
+            </select>
+          </label>
+          <label class="chat-optional-setting" data-optional-setting>
+            <span class="chat-setting-title">
+              Deliver as
+              <input class="chat-setting-apply" name="apply_delivery"
+                type="checkbox" value="true" aria-label="Apply delivery type">
+            </span>
+            <select id="chat-delivery" name="delivery">
+              <option value="conversation">Conversation response</option>
+              <option value="speech">Speech / audio</option>
+              <option value="document">Generated document</option>
+              <option value="speech_document">Audio + generated document</option>
+            </select>
+          </label>
+          <label class="chat-optional-setting" data-optional-setting>
+            <span class="chat-setting-title">
+              Top K
+              <input class="chat-setting-apply" name="apply_top_k"
+                type="checkbox" value="true" aria-label="Apply Top K">
+            </span>
+            <input name="top_k" type="number" min="1" max="50" value="3">
+          </label>
+          <label class="checkbox chat-check">
+            <input name="use_rag" type="checkbox" value="true" checked>
+            <span><strong>Use RAG</strong><small>Retrieve internal context</small></span>
+          </label>
+          <label class="checkbox chat-check">
+            <input name="shared_memory" type="checkbox" value="true" checked>
+            <span><strong>Shared memory</strong><small>Relevant previous sessions</small></span>
+          </label>
+          <label class="checkbox chat-check">
+            <input name="fact_check" type="checkbox" value="true">
+            <span><strong>Fact-check</strong><small>Verify on the open web</small></span>
+          </label>
+        </div>
+      </section>
+    </aside>
+  </form>
+
+  <dialog id="chat-source-dialog" class="chat-source-dialog"
+    aria-labelledby="chat-source-title">
+    <section class="chat-source-viewer">
+      <header>
+        <div>
+          <span class="eyebrow">Grounding source</span>
+          <h2 id="chat-source-title">Source document</h2>
+          <small id="chat-source-filename"></small>
+        </div>
+        <div class="chat-source-actions">
+          <label class="chat-source-format">
+            Download as
+            <select id="chat-source-format" aria-label="Source download format">
+              <option value="md">Markdown</option>
+              <option value="txt">TXT</option>
+              <option value="pdf">PDF</option>
+              <option value="docx">DOCX</option>
+            </select>
+          </label>
+          <a id="chat-source-download" class="button secondary small" href="#" download>
+            Download
+          </a>
+          <button id="chat-source-close" class="button secondary small" type="button">
+            Close
+          </button>
+        </div>
+      </header>
+      <pre id="chat-source-content" tabindex="0">Loading document…</pre>
+    </section>
+  </dialog>
 
   <script>
     (() => {
@@ -147,10 +218,24 @@
       const sessionSelect = document.getElementById("chat-session");
       const recordButton = document.getElementById("chat-record");
       const recordingStatus = document.getElementById("chat-recording-status");
+      const sourceDialog = document.getElementById("chat-source-dialog");
+      const sourceTitle = document.getElementById("chat-source-title");
+      const sourceFilename = document.getElementById("chat-source-filename");
+      const sourceContent = document.getElementById("chat-source-content");
+      const sourceDownload = document.getElementById("chat-source-download");
+      const sourceFormat = document.getElementById("chat-source-format");
+      const sourceClose = document.getElementById("chat-source-close");
       const foundryAvailable = {{ (foundry.available if foundry else false) | tojson }};
       let messages = [];
       let sessionId = localStorage.getItem(sessionStorageKey) || "";
+      let sessionReady = null;
       let recorder = null;
+      let activeGeneration = null;
+      let activeSource = "";
+      let activityMessage = {
+        content: "Ready to answer.",
+        tone: "ready",
+      };
 
       function persist() {
         localStorage.setItem(storageKey, JSON.stringify(messages.slice(-40)));
@@ -168,6 +253,61 @@
         return Number(value || 0).toLocaleString();
       }
 
+      function setActivity(content, tone = "ready") {
+        activityMessage = { content, tone };
+        status.textContent = content;
+        render();
+      }
+
+      function fillComposer(message) {
+        input.value = message.content;
+        input.focus();
+        input.setSelectionRange(input.value.length, input.value.length);
+        setActivity("Editing a copy of this message. Send it when ready.", "ready");
+      }
+
+      async function copyMessage(message) {
+        try {
+          if (!navigator.clipboard?.writeText) {
+            throw new Error("Clipboard access is unavailable.");
+          }
+          await navigator.clipboard.writeText(message.content);
+          setActivity("Message copied to clipboard. Ready to paste.", "ready");
+        } catch (error) {
+          setActivity(`Copy failed: ${error.message}`, "error");
+        }
+      }
+
+      async function openSource(source) {
+        activeSource = source;
+        sourceTitle.textContent = source;
+        sourceFilename.textContent = "";
+        sourceContent.textContent = "Loading document…";
+        updateSourceDownload();
+        if (!sourceDialog.open) sourceDialog.showModal();
+        try {
+          const document = await requestJson(
+            `/chat/sources/${encodeURIComponent(source)}`,
+          );
+          sourceTitle.textContent = document.title || source;
+          sourceFilename.textContent = document.filename || `${source}.md`;
+          sourceContent.textContent = document.content || "The document is empty.";
+          updateSourceDownload();
+          sourceContent.focus();
+        } catch (error) {
+          sourceContent.textContent = `Document could not be opened: ${error.message}`;
+        }
+      }
+
+      function updateSourceDownload() {
+        if (!activeSource) return;
+        const format = sourceFormat.value;
+        sourceDownload.href = `/chat/sources/${encodeURIComponent(activeSource)}/download`
+          + `?format=${encodeURIComponent(format)}`;
+        sourceDownload.download = `${activeSource}.${format}`;
+        sourceDownload.textContent = `Download ${format.toUpperCase()}`;
+      }
+
       function render() {
         messagesElement.replaceChildren();
         if (!messages.length) {
@@ -181,10 +321,22 @@
         messages.forEach((message) => {
           const card = element("article", `chat-message ${message.role}`);
           const head = element("header");
-          head.append(
+          const identity = element("div", "chat-message-identity");
+          identity.append(
             element("strong", "", message.role === "user" ? "You" : (message.agent || "Libra Assist")),
             element("small", "", message.attachment || message.model || ""),
           );
+          const actions = element("div", "chat-message-actions");
+          const copyButton = element("button", "message-action", "Copy");
+          copyButton.type = "button";
+          copyButton.title = "Copy to clipboard and composer";
+          copyButton.addEventListener("click", () => copyMessage(message));
+          const editButton = element("button", "message-action", "Edit");
+          editButton.type = "button";
+          editButton.title = "Edit a copy in the composer";
+          editButton.addEventListener("click", () => fillComposer(message));
+          actions.append(copyButton, editButton);
+          head.append(identity, actions);
           card.append(head, element("div", "chat-message-content", message.content));
 
           if (message.usage) {
@@ -208,12 +360,16 @@
               ));
             }
           }
-          if (message.memory) {
+          if (message.role === "assistant" && message.memory) {
             card.append(element(
               "div",
               "chat-message-meta",
-              `Memory: ${message.memory.current_summary_used ? "session summary used" : "recent history"}`
-              + ` · ${message.memory.shared_sessions_used || 0} shared session(s)`
+              `History: ${message.memory.saved_session
+                ? "restored from saved session"
+                : message.memory.current_summary_used
+                  ? "session summary used"
+                  : "recent conversation"}`
+              + ` · Sessions: ${message.memory.shared_sessions_used || 0} shared`
               + (message.memory.compaction ? ` · compaction ${message.memory.compaction}` : ""),
             ));
           }
@@ -224,6 +380,14 @@
               `Fact-check: ${message.factCheck.verdict} · ${message.factCheck.confidence} confidence. ${message.factCheck.reasoning || message.factCheck.error || ""}`,
             ));
           }
+          if (message.guardrail) {
+            card.append(element(
+              "div",
+              `chat-guardrail ${message.guardrail.status || ""}`,
+              `Grounding guardrail: ${message.guardrail.status || "checked"}`
+              + (message.guardrail.reason ? ` · ${message.guardrail.reason.replaceAll("_", " ")}` : ""),
+            ));
+          }
           if (message.augmented) {
             const sources = element("section", "chat-sources");
             sources.append(element("strong", "", "Grounding sources"));
@@ -232,8 +396,18 @@
               message.sources.forEach((source) => {
                 const score = Number(source.rerank_score ?? source.score ?? 0);
                 const item = element("li");
+                const sourceName = source.source || "";
+                const sourceLabel = sourceName || `Knowledge chunk ${source.index ?? ""}`;
+                const sourceControl = sourceName
+                  ? element("button", "chat-source-link", sourceLabel)
+                  : element("span", "", sourceLabel);
+                if (sourceName) {
+                  sourceControl.type = "button";
+                  sourceControl.title = `Open ${sourceLabel} in the chat viewer`;
+                  sourceControl.addEventListener("click", () => openSource(sourceName));
+                }
                 item.append(
-                  element("span", "", source.source || `Knowledge chunk ${source.index ?? ""}`),
+                  sourceControl,
                   element("small", "", `score ${score.toFixed(3)}`),
                 );
                 list.append(item);
@@ -248,25 +422,51 @@
             }
             card.append(sources);
           }
-          if (message.artifact?.kind === "speech") {
-            const audio = document.createElement("audio");
-            audio.controls = true;
-            audio.src = message.artifact.url;
-            card.append(audio);
-          } else if (message.artifact?.kind === "document") {
-            const link = element("a", "button secondary small", `Download ${message.artifact.filename}`);
-            link.href = message.artifact.url;
-            link.download = message.artifact.filename;
-            card.append(link);
-          }
+          const artifacts = message.artifacts?.length
+            ? message.artifacts
+            : (message.artifact ? [message.artifact] : []);
+          artifacts.forEach((artifact) => {
+            if (artifact.kind === "speech") {
+              const audio = document.createElement("audio");
+              audio.controls = true;
+              audio.src = artifact.url;
+              card.append(audio);
+            } else if (artifact.kind === "document") {
+              const link = element("a", "button secondary small", `Download ${artifact.filename}`);
+              link.href = artifact.url;
+              link.download = artifact.filename;
+              card.append(link);
+            }
+          });
           messagesElement.append(card);
         });
+        if (activityMessage) {
+          const activity = element(
+            "div",
+            `chat-activity ${activityMessage.tone}`,
+            activityMessage.content,
+          );
+          activity.setAttribute("role", "status");
+          messagesElement.append(activity);
+        }
         messagesElement.scrollTop = messagesElement.scrollHeight;
       }
 
       function updateDelivery() {
-        documentType.hidden = delivery.value !== "document";
+        const documentDelivery = ["document", "speech_document"].includes(delivery.value);
+        documentType.classList.toggle("delivery-active", documentDelivery);
       }
+
+      function updateOptionalSetting(setting) {
+        const checkbox = setting.querySelector(".chat-setting-apply");
+        setting.classList.toggle("applied", Boolean(checkbox?.checked));
+      }
+
+      sourceClose.addEventListener("click", () => sourceDialog.close());
+      sourceFormat.addEventListener("change", updateSourceDownload);
+      sourceDialog.addEventListener("click", (event) => {
+        if (event.target === sourceDialog) sourceDialog.close();
+      });
 
       function updateAgentMode() {
         const runsOn = agent.selectedOptions[0]?.dataset.runsOn || "local";
@@ -276,6 +476,44 @@
         localOption.disabled = runsOn === "foundry";
         if (agentMode.value === "foundry" && !foundryEnabled) agentMode.value = "local";
         if (runsOn === "foundry") agentMode.value = "foundry";
+      }
+
+      function generationId() {
+        if (window.crypto?.randomUUID) return window.crypto.randomUUID();
+        return `generation-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+      }
+
+      function setGenerating(generating) {
+        send.textContent = generating ? "■ Stop generating" : "Send message →";
+        send.classList.toggle("primary", !generating);
+        send.classList.toggle("danger", generating);
+        send.setAttribute(
+          "aria-label",
+          generating ? "Stop generating" : "Send message",
+        );
+      }
+
+      async function stopGeneration({ announce = true } = {}) {
+        const current = activeGeneration;
+        if (!current) return false;
+        current.cancelled = true;
+        activeGeneration = null;
+        current.controller.abort();
+        setGenerating(false);
+        if (announce) {
+          setActivity("Generation stopped. Ready to answer another message.", "stopped");
+        }
+        input.focus();
+        try {
+          await fetch(
+            `/chat/generations/${encodeURIComponent(current.id)}/cancel`,
+            { method: "POST", keepalive: true },
+          );
+        } catch (_error) {
+          // The local request is already stopped. The backend cancellation
+          // checkpoint prevents the discarded answer from being persisted.
+        }
+        return true;
       }
 
       function wavBlob(chunks, sourceRate) {
@@ -336,7 +574,7 @@
         current.silent.disconnect();
         await current.context.close();
         recordButton.classList.remove("recording");
-        recordButton.textContent = "●";
+        recordButton.textContent = "● Microphone";
         recordButton.setAttribute("aria-label", "Start microphone");
         recordingStatus.textContent = "Transcribing with Azure Speech…";
 
@@ -385,7 +623,7 @@
             sampleRate: context.sampleRate,
           };
           recordButton.classList.add("recording");
-          recordButton.textContent = "■";
+          recordButton.textContent = "■ Stop recording";
           recordButton.setAttribute("aria-label", "Stop and transcribe");
           recordingStatus.textContent = "Recording… press Stop when the question is complete.";
         } catch (error) {
@@ -395,8 +633,10 @@
 
       async function submit() {
         const text = input.value.trim();
-        if (!text || send.disabled) return;
+        if (!text || activeGeneration) return;
+        if (sessionReady) await sessionReady;
         if (!sessionId) await newSession();
+        const requestSessionId = sessionId;
         const history = messages
           .filter((item) => item.role === "user" || item.role === "assistant")
           .map((item) => ({ role: item.role, content: item.content }))
@@ -404,18 +644,40 @@
         const attachmentName = file.files[0]?.name || "";
         messages.push({ role: "user", content: text, attachment: attachmentName });
         persist();
-        render();
 
         const body = new FormData(form);
         body.set("history", JSON.stringify(history));
-        body.set("session_id", sessionId);
-        send.disabled = true;
-        input.disabled = true;
-        status.textContent = "Analysing and generating the answer…";
+        body.set("session_id", requestSessionId);
+        const current = {
+          id: generationId(),
+          controller: new AbortController(),
+          cancelled: false,
+          sessionId: requestSessionId,
+        };
+        body.set("generation_id", current.id);
+        input.value = "";
+        file.value = "";
+        fileNote.textContent = "PDF, DOCX, PPTX and text/code · maximum 20 MB";
+        activeGeneration = current;
+        setGenerating(true);
+        setActivity("Analysing and generating the answer…", "working");
+        input.focus();
         try {
-          const response = await fetch("/chat/message", { method: "POST", body });
+          const response = await fetch("/chat/message", {
+            method: "POST",
+            body,
+            signal: current.controller.signal,
+          });
           const result = await response.json();
           if (!response.ok) throw new Error(result.detail || `HTTP ${response.status}`);
+          if (current.cancelled || activeGeneration !== current || sessionId !== current.sessionId) {
+            return;
+          }
+          if (result.session_id && result.session_id !== sessionId) {
+            sessionId = result.session_id;
+            current.sessionId = result.session_id;
+            localStorage.setItem(sessionStorageKey, sessionId);
+          }
           messages.push({
             role: "assistant",
             content: result.answer,
@@ -423,41 +685,53 @@
             model: `${result.provider} · ${result.model}`,
             usage: result.usage,
             factCheck: result.fact_check,
+            guardrail: result.guardrail,
             augmented: result.augmented,
             sources: result.sources || [],
             artifact: result.artifact,
+            artifacts: result.artifacts || (result.artifact ? [result.artifact] : []),
             memory: result.memory,
           });
-          input.value = "";
-          file.value = "";
-          fileNote.textContent = "PDF, DOCX, PPTX and text/code · maximum 20 MB";
-          status.textContent = result.artifact?.kind === "document"
-            ? "Answer generated and document ready to download."
-            : result.artifact?.kind === "speech"
-              ? "Answer generated and audio ready."
-              : "Answer added to the conversation.";
+          const artifactKinds = new Set(
+            (result.artifacts || (result.artifact ? [result.artifact] : []))
+              .map((item) => item.kind),
+          );
+          const completionStatus = artifactKinds.has("document") && artifactKinds.has("speech")
+            ? "Answer generated with audio and document ready. Ready to answer."
+            : artifactKinds.has("document")
+              ? "Answer generated and document ready to download. Ready to answer."
+              : artifactKinds.has("speech")
+                ? "Answer generated and audio ready. Ready to answer."
+                : "Answer added to the conversation. Ready to answer.";
           persist();
-          render();
+          setActivity(completionStatus, "ready");
           await refreshSessions();
-          if (result.artifact?.kind === "speech") {
-            messagesElement.querySelector("article:last-child audio")?.play().catch(() => {});
+          if (artifactKinds.has("speech")) {
+            const audioPlayers = messagesElement.querySelectorAll("article audio");
+            audioPlayers[audioPlayers.length - 1]?.play().catch(() => {});
           }
         } catch (error) {
+          if (current.cancelled || error.name === "AbortError") return;
           messages.push({ role: "assistant", content: `Request failed: ${error.message}`, agent: "Error" });
-          status.textContent = error.message;
           persist();
-          render();
+          setActivity(`Request failed: ${error.message}`, "error");
         } finally {
-          send.disabled = false;
-          input.disabled = false;
-          input.focus();
+          if (activeGeneration === current) {
+            activeGeneration = null;
+            setGenerating(false);
+            input.focus();
+          }
         }
       }
 
       async function requestJson(url, options = {}) {
         const response = await fetch(url, options);
         const result = await response.json();
-        if (!response.ok) throw new Error(result.detail || `HTTP ${response.status}`);
+        if (!response.ok) {
+          const error = new Error(result.detail || `HTTP ${response.status}`);
+          error.status = response.status;
+          throw error;
+        }
         return result;
       }
 
@@ -472,9 +746,14 @@
             ? `${metadata.provider} · ${metadata.model}`
             : "",
           factCheck: metadata.fact_check,
+          guardrail: metadata.guardrail,
           augmented: metadata.augmented,
           sources: metadata.sources || [],
           attachment: metadata.attachment?.filename || "",
+          memory: metadata.memory || {
+            saved_session: true,
+            shared_sessions_used: 0,
+          },
         };
       }
 
@@ -496,6 +775,7 @@
       }
 
       async function loadSession(id) {
+        await stopGeneration({ announce: false });
         const detail = await requestJson(`/chat/sessions/${encodeURIComponent(id)}`);
         sessionId = detail.session_id;
         messages = (detail.messages || []).map(storedMessage);
@@ -505,11 +785,24 @@
       }
 
       async function newSession() {
-        const current = sessionId
-          ? (await requestJson(`/chat/sessions/${encodeURIComponent(sessionId)}`))
-          : null;
+        await stopGeneration({ announce: false });
+        let current = null;
+        if (sessionId) {
+          try {
+            current = await requestJson(
+              `/chat/sessions/${encodeURIComponent(sessionId)}`,
+            );
+          } catch (error) {
+            if (error.status !== 404) throw error;
+            sessionId = "";
+            messages = [];
+            localStorage.removeItem(sessionStorageKey);
+            localStorage.removeItem(storageKey);
+          }
+        }
         if (current && current.message_count === 0) {
           messages = [];
+          persist();
           render();
           input.focus();
           return;
@@ -531,11 +824,19 @@
           else if (sessions.length) await loadSession(sessions[0].session_id);
           else await newSession();
         } catch (error) {
-          status.textContent = `Sessions unavailable: ${error.message}`;
+          setActivity(`Sessions unavailable: ${error.message}`, "error");
         }
       }
 
-      form.addEventListener("submit", (event) => { event.preventDefault(); submit(); });
+      form.addEventListener("submit", (event) => {
+        event.preventDefault();
+        if (activeGeneration) stopGeneration();
+        else submit();
+      });
+      send.addEventListener("click", () => {
+        if (activeGeneration) stopGeneration();
+        else submit();
+      });
       input.addEventListener("keydown", (event) => {
         if (event.key === "Enter" && !event.shiftKey) {
           event.preventDefault();
@@ -547,11 +848,38 @@
           ? `${file.files[0].name} · ${(file.files[0].size / 1024).toFixed(1)} KB`
           : "PDF, DOCX, PPTX and text/code · maximum 20 MB";
       });
+      document.querySelectorAll("[data-optional-setting]").forEach((setting) => {
+        const checkbox = setting.querySelector(".chat-setting-apply");
+        const control = setting.querySelector("select, input[type='number']");
+        checkbox?.addEventListener("change", () => updateOptionalSetting(setting));
+        control?.addEventListener("change", () => {
+          if (checkbox) checkbox.checked = true;
+          updateOptionalSetting(setting);
+          if (control.name === "document_type") {
+            delivery.value = "document";
+            form.elements.apply_delivery.checked = true;
+            updateOptionalSetting(delivery.closest("[data-optional-setting]"));
+            updateDelivery();
+          }
+        });
+        updateOptionalSetting(setting);
+      });
       delivery.addEventListener("change", updateDelivery);
       agent.addEventListener("change", updateAgentMode);
-      sessionSelect.addEventListener("change", () => loadSession(sessionSelect.value));
-      document.getElementById("new-chat").addEventListener("click", newSession);
+      sessionSelect.addEventListener("change", async () => {
+        await loadSession(sessionSelect.value);
+        setActivity("Saved chat loaded. Ready to answer.", "ready");
+      });
+      document.getElementById("new-chat").addEventListener("click", async () => {
+        await newSession();
+        input.value = "";
+        file.value = "";
+        fileNote.textContent = "PDF, DOCX, PPTX and text/code · maximum 20 MB";
+        setActivity("New chat created. Ready to answer.", "ready");
+        input.focus();
+      });
       document.getElementById("clear-chat").addEventListener("click", async () => {
+        await stopGeneration({ announce: false });
         if (sessionId) {
           await requestJson(`/chat/sessions/${encodeURIComponent(sessionId)}`, {
             method: "DELETE",
@@ -560,6 +888,7 @@
         sessionId = "";
         messages = [];
         await newSession();
+        setActivity("Chat deleted. Ready to answer.", "ready");
       });
       document.querySelectorAll("[data-chat-topic]").forEach((button) => {
         button.addEventListener("click", () => {
@@ -575,6 +904,8 @@
           }
           if (button.dataset.delivery) {
             delivery.value = button.dataset.delivery;
+            form.elements.apply_delivery.checked = true;
+            updateOptionalSetting(delivery.closest("[data-optional-setting]"));
             updateDelivery();
           }
           input.focus();
@@ -583,7 +914,7 @@
       updateDelivery();
       updateAgentMode();
       render();
-      initializeSession();
+      sessionReady = initializeSession();
     })();
   </script>
 {% endblock %}

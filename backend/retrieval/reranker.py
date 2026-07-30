@@ -10,7 +10,8 @@ RANKING_ARRAY = re.compile(r"\[[\d,\s]*\]")
 SYSTEM_PROMPT = (
     "You are a retrieval re-ranker. Select only passages that help answer the "
     "question. Return one JSON array of passage numbers in best-first order, "
-    "with no explanation."
+    "with no explanation. Return [] when none is relevant. Do not fill a quota "
+    "with weak passages."
 )
 
 
@@ -75,14 +76,10 @@ def rerank_with_llm(
     except Exception:
         indexes = []
     if not indexes:
+        if re.fullmatch(r"\s*\[\s*\]\s*", result.text if result else ""):
+            selected = []
+            return (selected, result) if return_usage else selected
         selected = hits[:top_k]
         return (selected, result) if return_usage else selected
     selected = [hits[index] for index in indexes]
-    if len(selected) < top_k:
-        selected_ids = {item["id"] for item in selected}
-        selected.extend(
-            hit for hit in hits
-            if hit["id"] not in selected_ids
-        )
-    selected = selected[:top_k]
     return (selected, result) if return_usage else selected
