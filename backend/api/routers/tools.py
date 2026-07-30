@@ -62,7 +62,10 @@ async def transcribe(
     file: UploadFile = File(..., description="WAV, 16 kHz mono, under ~60 s"),
 ):
     """Convert a short uploaded WAV recording to text."""
-    audio = await file.read()
+    # The endpoint already enforces a small 10 MB bound. Reading the underlying
+    # spooled file directly also keeps BytesIO-backed tests from requiring a
+    # thread-pool hop.
+    audio = file.file.read()
     if not audio:
         raise HTTPException(
             status_code=422,

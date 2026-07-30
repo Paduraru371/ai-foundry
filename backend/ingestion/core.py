@@ -33,6 +33,28 @@ def chunk_static(text: str, size: int, overlap: int) -> list[str]:
     ]
 
 
+def chunk_word_window(text: str, size: int, overlap: int) -> list[str]:
+    """Split oversized text near word boundaries while honoring char overlap."""
+    chunks: list[str] = []
+    start = 0
+    while start < len(text):
+        end = min(len(text), start + size)
+        if end < len(text):
+            boundary = text.rfind(" ", start + size // 2, end)
+            if boundary > start:
+                end = boundary
+        piece = text[start:end].strip()
+        if piece:
+            chunks.append(piece)
+        if end >= len(text):
+            break
+        next_start = max(start + 1, end - overlap)
+        while next_start > start and not text[next_start - 1].isspace():
+            next_start -= 1
+        start = next_start if next_start > start else end
+    return chunks
+
+
 def chunk_sentence(text: str, per_chunk: int) -> list[str]:
     """Group every N sentences into one chunk."""
     sentences = split_sentences(text)
@@ -43,7 +65,12 @@ def chunk_sentence(text: str, per_chunk: int) -> list[str]:
     ]
 
 
-def chunk_dynamic(text: str, size: int, overlap: int) -> list[str]:
+def chunk_dynamic(
+    text: str,
+    size: int,
+    overlap: int,
+    min_size: int = 0,
+) -> list[str]:
     """Pack complete sentences into a size budget with sentence-tail overlap."""
     chunks: list[str] = []
     current: list[str] = []
@@ -70,7 +97,7 @@ def chunk_dynamic(text: str, size: int, overlap: int) -> list[str]:
         for sentence in split_sentences(paragraph):
             if len(sentence) > size:
                 flush()
-                chunks.extend(chunk_static(sentence, size, overlap))
+                chunks.extend(chunk_word_window(sentence, size, overlap))
                 current, current_len = [], 0
                 continue
             if current_len + len(sentence) + 1 > size:
@@ -81,17 +108,28 @@ def chunk_dynamic(text: str, size: int, overlap: int) -> list[str]:
             flush()
     if current:
         chunks.append(" ".join(current))
-    return [
+    deduplicated = [
         chunk
         for index, chunk in enumerate(chunks)
         if not (index > 0 and chunk and chunk in chunks[index - 1])
     ]
+    if (
+        len(deduplicated) > 1
+        and min_size > 0
+        and len(deduplicated[-1]) < min_size
+        and len(deduplicated[-2]) + len(deduplicated[-1]) + 1 <= size + overlap
+    ):
+        deduplicated[-2:] = [deduplicated[-2] + " " + deduplicated[-1]]
+    return deduplicated
 
 
 def chunk_semantic(
     text: str,
     threshold: float,
     embed_fn: EmbedFn,
+    size: int | None = None,
+    overlap: int = 0,
+    min_size: int = 0,
 ) -> list[str]:
     """Start a new chunk when adjacent sentence similarity drops."""
     sentences = split_sentences(text)
@@ -104,4 +142,15 @@ def chunk_semantic(
             chunks.append([sentences[index]])
         else:
             chunks[-1].append(sentences[index])
-    return [" ".join(chunk) for chunk in chunks]
+    semantic_chunks = [" ".join(chunk) for chunk in chunks]
+    if size is None:
+        return semantic_chunks
+    bounded: list[str] = []
+    for semantic_chunk in semantic_chunks:
+        if len(semantic_chunk) <= size:
+            bounded.append(semantic_chunk)
+        else:
+            bounded.extend(
+                chunk_dynamic(semantic_chunk, size, overlap, min_size)
+            )
+    return bounded

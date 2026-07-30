@@ -18,6 +18,17 @@ class ChatResult:
     model: str
     prompt_tokens: int | None = None
     completion_tokens: int | None = None
+    cached_input_tokens: int | None = None
+    reasoning_tokens: int | None = None
+
+
+def _detail_tokens(usage, group: str, name: str) -> int | None:
+    details = getattr(usage, group, None) if usage is not None else None
+    if isinstance(details, dict):
+        value = details.get(name)
+    else:
+        value = getattr(details, name, None)
+    return int(value) if value is not None else None
  
  
 class LLM:
@@ -60,6 +71,12 @@ class LLM:
                 model=self.model,
                 prompt_tokens=getattr(u, "prompt_tokens", None),
                 completion_tokens=getattr(u, "completion_tokens", None),
+                cached_input_tokens=_detail_tokens(
+                    u, "prompt_tokens_details", "cached_tokens"
+                ),
+                reasoning_tokens=_detail_tokens(
+                    u, "completion_tokens_details", "reasoning_tokens"
+                ),
             )
  
         if self.provider == "anthropic":
@@ -125,6 +142,12 @@ class LLM:
             model=self.model,
             prompt_tokens=getattr(u, "prompt_tokens", None),
             completion_tokens=getattr(u, "completion_tokens", None),
+            cached_input_tokens=_detail_tokens(
+                u, "prompt_tokens_details", "cached_tokens"
+            ),
+            reasoning_tokens=_detail_tokens(
+                u, "completion_tokens_details", "reasoning_tokens"
+            ),
         )
  
     def describe(self) -> dict:

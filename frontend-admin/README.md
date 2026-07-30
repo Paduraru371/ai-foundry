@@ -8,9 +8,10 @@ It calls the RAG backend at `http://localhost:7799`.
 | Page | Purpose |
 |---|---|
 | Overview | Display Qdrant and every supported LLM and embedding model |
-| Knowledge Base | Preview chunks, ingest documents, inspect and reset the collection |
+| Knowledge Base | Upload PDF/DOCX/PPTX/text, preview chunks, ingest documents, inspect and reset the collection |
 | Search | Run semantic searches and inspect similarity scores |
-| Test Answer | Compare answers with or without RAG and inspect the final prompt |
+| Chat | Multi-turn chat with per-message uploads and conversation/speech/document delivery |
+| Test Answer | Select agent/RAG/fact-check/output format, attach a document, and inspect answer/token cost |
 | Agents | Inspect personas, prompts and Foundry deployments |
 | Tools | Test web extraction, text-to-speech and transcription |
 | Platform Status | Inspect backend health, Azure resources and masked configuration |
@@ -25,16 +26,27 @@ scripts build and run the FastAPI admin frontend with Docker.
 Linux:
 
 ```bash
-./scripts/linux/start-frontend.sh
+./scripts/dev-admin.sh
 ```
 
 Windows PowerShell:
 
 ```powershell
-.\scripts\windows\start-frontend.ps1
+.\scripts\dev-admin.ps1
 ```
 
 Open <http://localhost:7800>.
 
 The backend must be running on <http://localhost:7799>.
 
+Uploaded files are processed in memory by the backend. Modern Office formats
+(`.docx`, `.pptx`) are supported; legacy `.doc`/`.ppt` files must first be saved
+in their modern format. The Test Answer page reports provider token usage,
+preflight input estimates, the configured output ceiling, and an estimated
+Azure GPT-5-mini input/output cost. Pricing values are configurable in `.env`.
+
+The Chat page stores the visible conversation in browser `localStorage` and sends
+the latest turns back to `/ask` as bounded history. Each answer can stay in the
+conversation, become playable WAV speech, or be downloaded as PDF, DOCX, TXT,
+Markdown, or JSON. Generated files/audio are kept in a bounded in-memory store
+for one hour.

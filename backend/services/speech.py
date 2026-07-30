@@ -9,7 +9,7 @@ A Speech resource is *separate* from your Foundry resource: its own endpoint, it
 own region, its own key. That is the point made in the session — services are not
 the model, and one credential does not open all of them.
 
-Config:  AZURE_SPEECH_KEY, AZURE_SPEECH_REGION, AZURE_SPEECH_VOICE
+Config: AZURE_SPEECH_ENDPOINT, AZURE_SPEECH_KEY, AZURE_RESOURCE_ID.
 """
 from __future__ import annotations
 
@@ -25,7 +25,7 @@ class SpeechUnavailable(Exception):
     """Raised with instructions when the Speech resource is not configured."""
 
 
-def _credentials() -> tuple[str, str]:
+def _credentials() -> tuple[str, str, str]:
     """Key and region for Speech.
 
     A Foundry resource of kind AIServices is *multi-service*: the same key and
@@ -39,29 +39,51 @@ def _credentials() -> tuple[str, str]:
     """
     key = settings.azure_speech_key or settings.azure_ai_api_key
     region = settings.azure_speech_region or settings.azure_location
-    if not key or not region:
+    endpoint = settings.azure_speech_endpoint.rstrip("/")
+    if not key or (not endpoint and not region):
         raise SpeechUnavailable(
-            "Speech is not configured. Either set AZURE_SPEECH_KEY and AZURE_SPEECH_REGION "
+            "Speech is not configured. Set AZURE_SPEECH_ENDPOINT and AZURE_SPEECH_KEY "
+            "(AZURE_RESOURCE_ID is retained for Entra/resource identity), or set "
+            "AZURE_SPEECH_KEY and AZURE_SPEECH_REGION "
             "for a dedicated Speech resource, or — since a Foundry AIServices resource "
             "includes Speech — set AZURE_AI_API_KEY and AZURE_LOCATION and it will be used. "
             "See the Session 4 page, 'Speech: giving the assistant a voice'."
         )
-    return key, region
+    return key, endpoint, region
 
 
 def describe() -> dict:
     """What /health reports, without raising when nothing is configured."""
     try:
-        key, region = _credentials()
+        _key, endpoint, region = _credentials()
     except SpeechUnavailable:
-        return {"configured": False, "region": None, "source": None,
-                "voice": settings.azure_speech_voice}
+        return {
+            "configured": False,
+            "region": None,
+            "source": None,
+            "voice": settings.azure_speech_voice,
+            "tts": {"configured": False, "status": "not configured"},
+            "stt": {"configured": False, "status": "not configured"},
+        }
     dedicated = bool(settings.azure_speech_key)
+    endpoint_mode = "custom endpoint" if endpoint else f"regional endpoint · {region}"
     return {
         "configured": True,
         "region": region,
+        "endpoint": endpoint or None,
+        "resource_id_configured": bool(settings.azure_resource_id),
         "source": "dedicated Speech resource" if dedicated else "Foundry AIServices resource",
         "voice": settings.azure_speech_voice,
+        "tts": {
+            "configured": True,
+            "status": "configured",
+            "detail": endpoint_mode,
+        },
+        "stt": {
+            "configured": True,
+            "status": "configured",
+            "detail": endpoint_mode,
+        },
     }
 
 
@@ -71,7 +93,7 @@ def _require_config() -> None:
 
 def synthesize(text: str, voice: str | None = None) -> bytes:
     """Text -> spoken audio (WAV bytes). The request body is SSML."""
-    key, region = _credentials()
+    key, endpoint, region = _credentials()
     voice = voice or settings.azure_speech_voice
     locale = "-".join(voice.split("-")[:2]) if "-" in voice else "en-US"
 
@@ -80,7 +102,11 @@ def synthesize(text: str, voice: str | None = None) -> bytes:
         f'<voice xml:lang="{locale}" name="{voice}">{_escape(text)}</voice>'
         f"</speak>"
     )
-    url = f"https://{region}.tts.speech.microsoft.com/cognitiveservices/v1"
+    url = (
+        f"{endpoint}/tts/cognitiveservices/v1"
+        if endpoint
+        else f"https://{region}.tts.speech.microsoft.com/cognitiveservices/v1"
+    )
 
     response = httpx.post(
         url,
@@ -102,10 +128,12 @@ def synthesize(text: str, voice: str | None = None) -> bytes:
 
 def transcribe(audio: bytes, content_type: str = "audio/wav", language: str | None = None) -> dict:
     """Spoken audio -> text. Short-audio endpoint: up to about 60 seconds."""
-    key, region = _credentials()
+    key, endpoint, region = _credentials()
     language = language or settings.azure_speech_language
 
     url = (
+        f"{endpoint}/stt/speech/recognition/conversation/cognitiveservices/v1"
+        if endpoint else
         f"https://{region}.stt.speech.microsoft.com"
         f"/speech/recognition/conversation/cognitiveservices/v1"
     )

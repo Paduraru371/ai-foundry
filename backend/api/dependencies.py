@@ -24,6 +24,7 @@ def chunk_params(req: ChunkRequest) -> dict:
         ),
         "per_chunk": req.sentences_per_chunk or settings.sentences_per_chunk,
         "threshold": req.semantic_threshold or settings.semantic_threshold,
+        "min_size": min(settings.chunk_min_size, req.chunk_size or settings.chunk_size),
     }
 
 
@@ -40,6 +41,7 @@ def do_chunk(req: ChunkRequest) -> tuple[list[str], dict]:
             threshold=params["threshold"],
             embed_fn=embed_fn,
             document_title=req.document_title,
+            min_size=params["min_size"],
         )
     except ValueError as error:
         raise HTTPException(status_code=422, detail=str(error))
@@ -115,4 +117,5 @@ def retrieve(
         min_score=threshold,
         vector_weight=settings.retrieval_vector_weight,
         duplicate_threshold=settings.retrieval_duplicate_threshold,
+        max_per_source=settings.retrieval_max_per_source,
     )

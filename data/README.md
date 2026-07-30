@@ -1,64 +1,39 @@
-# Libra Internet Bank onboarding corpus — synthetic training data
+# Banking onboarding corpus
 
-This directory contains a **fully synthetic banking onboarding knowledge base** created for a retrieval-augmented generation exercise.
+This directory contains a focused knowledge corpus for evaluating retrieval-augmented generation in personal and business onboarding. Each knowledge document contains YAML front matter that can be converted into searchable metadata.
 
-The real public name **Libra Internet Bank** and public journey labels such as personal online onboarding, business online onboarding, and a two-in-one journey are used only to make the domain coherent. All fees, thresholds, deadlines, documents, internal teams, statuses, workflows, exceptions, and version changes in these files are invented.
+## Scope
 
-This corpus:
+- personal account onboarding;
+- business account onboarding;
+- remote identity verification;
+- customer due diligence and beneficial ownership;
+- fees, timelines, activation, rejection, and complaints;
+- active and superseded versions dated 2025 and 2026.
 
-- contains no customer data;
-- contains no employee data;
-- contains no internal Libra Internet Bank documents;
-- must not be presented as an accurate description of the bank's real policies;
-- must not be used for real financial decisions or customer support.
+`README.md` is an inventory document and should be excluded from the production knowledge index.
 
-Every knowledge document includes `synthetic: true` in its metadata header.
+## Difficult cases included
 
-## Files
-
-1. `01_personal_onboarding_overview.md` — overall personal onboarding journey.
-2. `02_personal_eligibility_2025.md` — historical eligibility version.
-3. `03_personal_eligibility_2026.md` — current synthetic eligibility version.
-4. `04_accepted_identity_documents.md` — identity-document rules.
-5. `05_video_identification_procedure.md` — long numbered procedure.
-6. `06_personal_onboarding_fees_2025.md` — historical fee table.
-7. `07_personal_onboarding_fees_2026.md` — current fee table.
-8. `08_proof_of_address.md` — address evidence.
-9. `09_business_onboarding_eligibility.md` — business eligibility.
-10. `10_business_onboarding_fee_schedule.md` — business fees.
-11. `11_business_onboarding_procedure.md` — long business procedure.
-12. `12_two_in_one_onboarding.md` — linked personal and business journey.
-13. `13_sanctions_and_pep_review.md` — compliance-review workflow.
-14. `14_application_status_and_expiry.md` — statuses and versioned deadlines.
-15. `15_failed_verification_and_recovery.md` — failure and retry rules.
-16. `16_onboarding_complaints.md` — complaint process and absent legal details.
-
-## Required difficult cases
-
-| Case | Documents | Test |
+| Required case | Documents | Test design |
 |---|---|---|
-| Precise number | `07_personal_onboarding_fees_2026.md` | Foreign identity-document review is exactly **1%** of initial funding, capped at **100 RON**. |
-| Two documents must be combined | `03_personal_eligibility_2026.md` + `07_personal_onboarding_fees_2026.md` | Eligibility and minimum funding are separate from fees. |
-| Two documents must be combined | `09_business_onboarding_eligibility.md` + `10_business_onboarding_fee_schedule.md` | Business eligibility and business costs are separate. |
-| Near-duplicates that differ | `02_personal_eligibility_2025.md` vs `03_personal_eligibility_2026.md` | Similar title and content, but different limits, dates, and funding rules. |
-| Near-duplicates that differ | `06_personal_onboarding_fees_2025.md` vs `07_personal_onboarding_fees_2026.md` | Fixed 2025 fee versus percentage-based 2026 fee. |
-| Long procedure with steps | `05_video_identification_procedure.md`, `11_business_onboarding_procedure.md` | Chunking may split dependent numbered steps. |
-| Table | `06_personal_onboarding_fees_2025.md`, `07_personal_onboarding_fees_2026.md`, `10_business_onboarding_fee_schedule.md` | Plain-text chunking may separate headings, rows, and values. |
-| Contradiction across versions | `02_personal_eligibility_2025.md` vs `03_personal_eligibility_2026.md` | Account limit changes from two to three; application validity changes from 30 to 45 days. |
-| Something deliberately absent | Entire corpus | Student-loan onboarding rules, interest rates, and eligibility are absent. The assistant must say the corpus does not contain the answer, without claiming whether the real bank offers such a product. |
-| Something deliberately absent | `16_onboarding_complaints.md` | Real regulator, ombudsman, legal deadlines, and legal remedies are absent. |
+| Precise number | `05_manual_review_and_processing_times.md`, `08_personal_onboarding_fees_2026.md`, `19_identification_retries_2026.md` | 2 working days, 75 lei per document, 3 attempts, and 15 days |
+| Two documents must be combined | `09_online_business_account_eligibility.md` and `13_business_onboarding_fees_2026.md` | Eligibility and pricing are stored separately |
+| Near-duplicates with different answers | `07_personal_onboarding_fees_2025.md` and `08_personal_onboarding_fees_2026.md` | Similar fee schedules with different dates and amounts |
+| Long procedure | `04_complete_personal_onboarding_procedure.md` and `12_complete_business_onboarding_procedure.md` | Procedures with 17 and 20 ordered steps |
+| Table | `07_personal_onboarding_fees_2025.md`, `08_personal_onboarding_fees_2026.md`, and `13_business_onboarding_fees_2026.md` | Markdown tables with fees by service or applicant type |
+| Contradiction across versions | `18_identification_retries_2025.md` and `19_identification_retries_2026.md` | The limit changes from 5 to 3 attempts and the validity period from 30 to 15 days |
+| Deliberately absent information | No document covers student loans, mortgages, or card cash-withdrawal limits | The assistant must decline to invent an answer |
 
-## Suggested test questions
+## Suggested validation prompts
 
-- What is the personal account limit for an application submitted in February 2026?
-- What was the account limit in October 2025?
-- Can an applicant submit only 50 RON as initial funding in 2026?
-- What is the foreign document review fee for initial funding of 2,000 RON?
-- What is the fee for initial funding of 15,000 RON?
-- What happens after the third unsuccessful video-identification attempt?
-- Can an applicant use a utility invoice as identity evidence?
-- What is required and what is charged for a Start business application?
-- In the two-in-one flow, can the personal account activate while the business application remains under review?
-- What are Libra Internet Bank's student-loan onboarding rules?
+1. How many video-identification attempts are permitted for an application started in February 2026?
+2. What limit applied in December 2025?
+3. What is the fee for reviewing two foreign-language documents for a personal customer in 2026?
+4. Can a company with three ownership levels open an account, and what opening fee applies?
+5. What are all the steps after video identification in business onboarding?
+6. Can the personal component be approved while the business component of Online Account 2 in 1 remains under review?
+7. What evidence may be required for an indirect beneficial owner?
+8. What is the interest rate on student loans?
 
-The final question must produce an explicit knowledge-base limitation, not a fabricated answer.
+For question 8, the correct behaviour is to state that the information is not available in the corpus rather than estimate it.

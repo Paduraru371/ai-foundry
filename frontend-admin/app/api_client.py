@@ -27,6 +27,7 @@ class RagApiClient:
         payload: dict[str, Any] | None = None,
         *,
         files: dict[str, tuple[str, bytes, str]] | None = None,
+        data: dict[str, Any] | None = None,
         raw: bool = False,
     ) -> dict[str, Any] | bytes:
         try:
@@ -35,8 +36,9 @@ class RagApiClient:
                 response = await client.request(
                     method,
                     f"{BACKEND_URL}{path}",
-                    json=payload if files is None else None,
+                    json=payload if files is None and data is None else None,
                     files=files,
+                    data=data,
                 )
                 
         except httpx.RequestError as exc:
@@ -83,6 +85,14 @@ class RagApiClient:
         top_k: int,
         agent: str = "default",
         agent_mode: str = "local",
+        fact_check: bool = False,
+        response_format: str = "plain",
+        document_text: str | None = None,
+        document_name: str | None = None,
+        history: list[dict[str, str]] | None = None,
+        session_id: str | None = None,
+        shared_memory: bool = True,
+        document_path: str | None = None,
     ) -> dict[str, Any]:
         return await self._request(
             "POST",
@@ -93,7 +103,47 @@ class RagApiClient:
                 "top_k": top_k,
                 "agent": agent,
                 "agent_mode": agent_mode,
+                "fact_check": fact_check,
+                "response_format": response_format,
+                "document_text": document_text,
+                "document_name": document_name,
+                "document_path": document_path,
+                "history": history or [],
+                "session_id": session_id,
+                "shared_memory": shared_memory,
             },
+        )
+
+    async def sessions(self) -> list[dict[str, Any]]:
+        return await self._request("GET", "/sessions")
+
+    async def create_session(self, title: str = "New conversation") -> dict[str, Any]:
+        return await self._request("POST", "/sessions", {"title": title})
+
+    async def session(self, session_id: str) -> dict[str, Any]:
+        return await self._request(
+            "GET",
+            f"/sessions/{quote(session_id, safe='')}",
+        )
+
+    async def delete_session(self, session_id: str) -> dict[str, Any]:
+        return await self._request(
+            "DELETE",
+            f"/sessions/{quote(session_id, safe='')}",
+        )
+
+    async def extract_document(
+        self,
+        filename: str,
+        content: bytes,
+        content_type: str,
+        session_id: str | None = None,
+    ) -> dict[str, Any]:
+        return await self._request(
+            "POST",
+            "/documents/extract",
+            files={"file": (filename, content, content_type)},
+            data={"session_id": session_id} if session_id else None,
         )
 
     async def reset_collection(self) -> dict[str, Any]:

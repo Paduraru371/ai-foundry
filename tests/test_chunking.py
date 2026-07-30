@@ -6,6 +6,19 @@ from backend.ingestion.chunking import chunk, chunk_heading
 
 
 class HeadingChunkingTests(unittest.TestCase):
+    def test_dynamic_oversized_sentence_uses_word_boundaries(self) -> None:
+        chunks = chunk(
+            "alpha beta gamma delta epsilon zeta eta theta",
+            "dynamic",
+            size=20,
+            overlap=4,
+            per_chunk=3,
+            threshold=0.75,
+        )
+
+        self.assertGreater(len(chunks), 1)
+        self.assertTrue(all(piece[0].isalpha() and piece[-1].isalpha() for piece in chunks))
+
     def test_frontmatter_title_and_section_are_added_as_context(self) -> None:
         text = """---
 title: Account eligibility

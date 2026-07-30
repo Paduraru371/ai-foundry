@@ -317,6 +317,8 @@ def _run_thread(agent_id: str, persona_name: str, question: str, chunks: list[di
             break
 
     usage = run_obj.get("usage") or {}
+    prompt_details = usage.get("prompt_tokens_details") or {}
+    completion_details = usage.get("completion_tokens_details") or {}
     return AgentReply(
         text=answer or "(the run produced no assistant message)",
         mode="foundry",
@@ -327,4 +329,6 @@ def _run_thread(agent_id: str, persona_name: str, question: str, chunks: list[di
         model=run_obj.get("model") or settings.azure_ai_chat_deployment,
         prompt_tokens=usage.get("prompt_tokens"),
         completion_tokens=usage.get("completion_tokens"),
+        cached_input_tokens=prompt_details.get("cached_tokens"),
+        reasoning_tokens=completion_details.get("reasoning_tokens"),
     )

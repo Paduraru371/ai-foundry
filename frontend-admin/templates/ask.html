@@ -13,7 +13,7 @@
     <header class="panel-header">
       <div><span class="eyebrow">POST /ask</span><h2>Question for Libra Assist</h2></div>
     </header>
-    <form method="post" action="/ask">
+    <form method="post" action="/ask" enctype="multipart/form-data">
       <label>
         Operator question
         <textarea id="question-input" name="question" rows="4" required
@@ -26,6 +26,20 @@
         <span id="recording-status" class="muted" role="status">
           Speak your question and stop when finished.
         </span>
+      </div>
+      <div class="upload-zone compact-upload">
+        <label class="grow">
+          Document to analyse (optional)
+          <input name="document" type="file"
+            accept=".pdf,.doc,.docx,.ppt,.pptx,.txt,.md,.csv,.json,.xml,.yaml,.yml,.html,.htm,.rtf,.log,.py,.js,.ts,.java,.c,.cpp,.sql">
+          <span class="field-hint">Its extracted text is added to this task only; it is not stored in Qdrant.</span>
+        </label>
+        {% if document %}
+          <div class="document-chip">
+            <strong>{{ document.filename }}</strong>
+            <span>{{ document.characters }} chars · ~{{ document.estimated_tokens }} tokens</span>
+          </div>
+        {% endif %}
       </div>
       <div class="ask-settings">
         <label class="agent-field">
@@ -62,9 +76,28 @@
           <span><strong>Use RAG</strong><small>Add relevant chunks to the prompt</small></span>
         </label>
         <label class="checkbox">
+          <input name="fact_check" type="checkbox" value="true" {{ 'checked' if fact_check else '' }}>
+          <span><strong>Fact-check</strong><small>Verify against the open web</small></span>
+        </label>
+        <label class="checkbox">
           <input name="speak_answer" type="checkbox" value="true"
             {{ 'checked' if speak_answer else '' }}>
           <span><strong>Agent voice</strong><small>Read the answer aloud</small></span>
+        </label>
+        <label class="format-field">
+          Response format
+          <select name="response_format">
+            {% for value, label in [
+              ('plain', 'Plain text'), ('markdown', 'Markdown'),
+              ('bullet_list', 'Bullet list'), ('table', 'Table'),
+              ('json', 'JSON'), ('executive_summary', 'Executive summary'),
+              ('technical_report', 'Technical report')
+            ] %}
+              <option value="{{ value }}" {{ 'selected' if response_format == value else '' }}>
+                {{ label }}
+              </option>
+            {% endfor %}
+          </select>
         </label>
         <label class="compact-field">
           Top K
@@ -101,12 +134,85 @@
         </div>
       {% endif %}
       {% if result.usage %}
-        <p class="token-usage">
-          Prompt tokens: {{ result.usage.prompt_tokens or '—' }} ·
-          completion tokens: {{ result.usage.completion_tokens or '—' }}
-        </p>
+        <div class="usage-grid">
+          <div>
+            <span>Input tokens</span>
+            <strong>{{ result.usage.prompt_tokens if result.usage.prompt_tokens is not none else '—' }}</strong>
+            <small>preflight estimate: {{ result.usage.estimated_prompt_tokens }}</small>
+          </div>
+          <div>
+            <span>Output tokens</span>
+            <strong>{{ result.usage.completion_tokens if result.usage.completion_tokens is not none else '—' }}</strong>
+            <small>configured maximum: {{ result.usage.estimated_max_completion_tokens }}</small>
+          </div>
+          <div>
+            <span>Total consumed</span>
+            <strong>{{ result.usage.total_tokens if result.usage.total_tokens is not none else '—' }}</strong>
+            <small>
+              cached input: {{ result.usage.cached_input_tokens or 0 }} ·
+              reasoning: {{ result.usage.reasoning_tokens or 0 }}
+            </small>
+          </div>
+          <div>
+            <span>Estimated Azure cost</span>
+            <strong>
+              {% if result.usage.estimated_cost_usd is not none %}
+                ${{ '%.6f' | format(result.usage.estimated_cost_usd) }}
+              {% else %}n/a{% endif %}
+            </strong>
+            <small>
+              input
+              {% if result.usage.input_cost_usd is not none %}${{ '%.6f' | format(result.usage.input_cost_usd) }}{% else %}n/a{% endif %}
+              · output
+              {% if result.usage.output_cost_usd is not none %}${{ '%.6f' | format(result.usage.output_cost_usd) }}{% else %}n/a{% endif %}
+            </small>
+          </div>
+        </div>
+        {% if result.usage.pricing and result.usage.pricing.input is not none %}
+          <p class="pricing-note">
+            Estimate for Azure {{ result.usage.pricing.model }}:
+            ${{ result.usage.pricing.input }}/1M input ·
+            ${{ result.usage.pricing.cached_input }}/1M cached input ·
+            ${{ result.usage.pricing.output }}/1M output. Actual Azure billing may vary by region and deployment type.
+          </p>
+        {% endif %}
       {% endif %}
     </section>
+
+    {% if result.fact_check %}
+      <section class="panel">
+        <header class="panel-header">
+          <div><span class="eyebrow">Open-web verification</span><h2>Fact-check</h2></div>
+          <span class="status-pill {{ 'ok' if result.fact_check.verdict == 'supported' else 'error' }}">
+            {{ result.fact_check.verdict }}
+          </span>
+        </header>
+        <p>{{ result.fact_check.reasoning or result.fact_check.error }}</p>
+        <div class="badge-row">
+          <span class="status-pill">{{ result.fact_check.confidence }} confidence</span>
+          <span class="status-pill">{{ result.fact_check.evidence_from }}</span>
+        </div>
+        {% if result.fact_check.sources %}
+          <ul class="source-list">
+            {% for source in result.fact_check.sources %}
+              <li>
+                <a href="{{ source.url }}" target="_blank" rel="noreferrer">{{ source.title or source.url }}</a>
+                <small>{{ source.chars_read }} characters read{% if not source.used %} · unavailable{% endif %}</small>
+              </li>
+            {% endfor %}
+          </ul>
+        {% endif %}
+        {% if result.fact_check.usage %}
+          <p class="pricing-note">
+            Fact-check model call:
+            {{ result.fact_check.usage.total_tokens or '—' }} tokens ·
+            {% if result.fact_check.usage.estimated_cost_usd is not none %}
+              estimated ${{ '%.6f' | format(result.fact_check.usage.estimated_cost_usd) }}
+            {% else %}cost n/a{% endif %}
+          </p>
+        {% endif %}
+      </section>
+    {% endif %}
 
     <section class="panel">
       <header class="panel-header">

@@ -322,11 +322,17 @@ API keys are **not accepted** by the Agent Service — it is Entra-only. Set
 POST /tools/web-fetch    # a deliberately plain scraper — read its `warnings` array
 POST /tools/speak        # text → WAV (Azure AI Speech; needs AZURE_SPEECH_KEY/REGION)
 POST /tools/transcribe   # upload a WAV → text
+POST /documents/extract  # upload PDF/DOCX/PPTX/text → extracted text + token estimate
 ```
 
 `/tools/web-fetch` exists to be honest about scraping: it reports what the naive
 approach could not do (JavaScript rendering, bot walls, consent banners, non-HTML
 formats). That list is the argument for managed grounding.
+
+`POST /ask` also accepts `response_format`, optional extracted `document_text` /
+`document_name`, and `fact_check`. Its `usage` object separates actual input/output
+tokens, preflight estimates, cached/reasoning tokens, request phases (reranker and
+answer), and the configurable Azure GPT-5-mini cost estimate.
 
 Chunking strategies (`strategy` in the request body): `static` (fixed windows),
 `sentence` (N sentences per chunk), `dynamic` (paragraph/sentence-aware packing with

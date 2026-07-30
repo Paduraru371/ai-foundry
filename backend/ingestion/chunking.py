@@ -32,6 +32,7 @@ def chunk(
     threshold: float,
     embed_fn: EmbedFn | None = None,
     document_title: str | None = None,
+    min_size: int = 0,
 ) -> list[str]:
     text = text.strip()
     if not text:
@@ -43,15 +44,28 @@ def chunk(
         case "sentence":
             return chunk_sentence(text, per_chunk)
         case "dynamic":
-            return chunk_dynamic(text, size, overlap)
+            return chunk_dynamic(text, size, overlap, min_size)
         case "heading":
-            return chunk_heading(text, size, overlap, document_title)
+            return chunk_heading(
+                text,
+                size,
+                overlap,
+                document_title,
+                min_size,
+            )
         case "semantic":
             if embed_fn is None:
                 raise ValueError(
                     "Semantic chunking requires an embedding function."
                 )
-            return chunk_semantic(text, threshold, embed_fn)
+            return chunk_semantic(
+                text,
+                threshold,
+                embed_fn,
+                size,
+                overlap,
+                min_size,
+            )
         case _:
             available = ", ".join(sorted(STRATEGIES))
             raise ValueError(

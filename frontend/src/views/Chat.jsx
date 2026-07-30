@@ -8,6 +8,8 @@ export default function Chat({ agents, hostedOnly = [], foundry }) {
   const [agent, setAgent] = useState('default')
   const [useRag, setUseRag] = useState(true)
   const [factCheck, setFactCheck] = useState(false)
+  const [sharedMemory, setSharedMemory] = useState(true)
+  const [sessionId, setSessionId] = useState('')
   const [mode, setMode] = useState('local')
   const [topK, setTopK] = useState(3)
   const [busy, setBusy] = useState(false)
@@ -15,6 +17,35 @@ export default function Chat({ agents, hostedOnly = [], foundry }) {
   const endRef = useRef(null)
 
   useEffect(() => { endRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [messages, busy])
+  useEffect(() => {
+    let mounted = true
+    async function initializeSession() {
+      const saved = localStorage.getItem('libra-chat-session') || ''
+      let detail = null
+      if (saved) {
+        try { detail = await api.session(saved) } catch { detail = null }
+      }
+      if (!detail) detail = await api.createSession()
+      if (!mounted) return
+      setSessionId(detail.session_id)
+      localStorage.setItem('libra-chat-session', detail.session_id)
+      setMessages((detail.messages || []).map((item) => (
+        item.role === 'user'
+          ? { role: 'user', text: item.content }
+          : {
+              role: 'bot',
+              data: {
+                answer: item.content,
+                ...(item.metadata || {}),
+                agent: { display_name: item.metadata?.agent || 'Libra Assist' },
+                augmented: false,
+              },
+            }
+      )))
+    }
+    initializeSession().catch((e) => setError(e.message))
+    return () => { mounted = false }
+  }, [])
 
   async function send() {
     const text = question.trim()
@@ -23,12 +54,22 @@ export default function Chat({ agents, hostedOnly = [], foundry }) {
     setMessages((m) => [...m, { role: 'user', text }])
     try {
       const data = await api.ask({ question: text, use_rag: useRag, top_k: Number(topK),
-                                  agent, agent_mode: mode, fact_check: factCheck })
+                                  agent, agent_mode: mode, fact_check: factCheck,
+                                  session_id: sessionId || undefined,
+                                  shared_memory: sharedMemory })
       setMessages((m) => [...m, { role: 'bot', data }])
     } catch (e) {
       setMessages((m) => [...m, { role: 'err', text: e.message }])
       setError(e.message)
     } finally { setBusy(false) }
+  }
+
+  async function clearSession() {
+    if (sessionId) await api.deleteSession(sessionId).catch(() => {})
+    const detail = await api.createSession()
+    setSessionId(detail.session_id)
+    localStorage.setItem('libra-chat-session', detail.session_id)
+    setMessages([])
   }
 
   const all = [...agents, ...hostedOnly]
@@ -78,6 +119,12 @@ export default function Chat({ agents, hostedOnly = [], foundry }) {
           <input type="checkbox" checked={factCheck} onChange={(e) => setFactCheck(e.target.checked)} />
           fact-check
         </label>
+        <label className="check" style={{ margin: 0 }}
+               title="Reuse only semantically relevant summaries from previous sessions">
+          <input type="checkbox" checked={sharedMemory}
+                 onChange={(e) => setSharedMemory(e.target.checked)} />
+          shared memory
+        </label>
         <select value={mode} onChange={(e) => setMode(e.target.value)} style={{ minWidth: '9rem' }}
                 title="Where the loop executes">
           <option value="local" disabled={localImpossible}
@@ -102,7 +149,7 @@ export default function Chat({ agents, hostedOnly = [], foundry }) {
             deploy “{current.display_name}” from Agents first
           </span>
         )}
-        <button className="btn btn-outline btn-sm" onClick={() => setMessages([])}>clear</button>
+        <button className="btn btn-outline btn-sm" onClick={clearSession}>new session</button>
         {current && <span className="badge muted" title={current.description}>temp {current.temperature ?? '—'}</span>}
       </div>
 
@@ -130,7 +177,17 @@ export default function Chat({ agents, hostedOnly = [], foundry }) {
                 <span className="badge muted">{d.agent?.mode}</span>
                 <span className="badge muted">{d.model}</span>
                 {d.usage && <span className="badge muted">{d.usage.prompt_tokens}↑ {d.usage.completion_tokens}↓ tokens</span>}
+                {d.usage?.estimated_cost_usd != null && (
+                  <span className="badge muted">${d.usage.estimated_cost_usd.toFixed(6)} est.</span>
+                )}
               </div>
+              {d.usage?.pricing?.input != null && (
+                <div className="faint" style={{ marginTop: '.35rem', fontSize: '.75rem' }}>
+                  Azure GPT-5 mini / 1M: ${d.usage.pricing.input} input ·
+                  {' '}${d.usage.pricing.cached_input} cached ·
+                  {' '}${d.usage.pricing.output} output
+                </div>
+              )}
               {d.fact_check && (
                 <div className="src" style={{ marginTop: '.55rem',
                      borderLeftColor: d.fact_check.verdict === 'supported' ? 'var(--c-teal)'

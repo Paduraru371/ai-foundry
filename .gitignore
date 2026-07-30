@@ -46,6 +46,10 @@ frontend/dist/
 
 # --- local run logs ---
 *.log
+uploads/*
+!uploads/.gitkeep
+runtime/*
+!runtime/.gitkeep
 
 # --- local editor/agent tooling state ---
 .claude/

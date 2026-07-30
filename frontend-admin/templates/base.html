@@ -26,6 +26,9 @@
         <a class="nav-item {{ 'active' if active_page == 'search' else '' }}" href="/search">
           <span aria-hidden="true">⌕</span> Search
         </a>
+        <a class="nav-item {{ 'active' if active_page == 'chat' else '' }}" href="/chat">
+          <span aria-hidden="true">◉</span> Chat
+        </a>
         <a class="nav-item {{ 'active' if active_page == 'ask' else '' }}" href="/ask">
           <span aria-hidden="true">✦</span> Test answer
         </a>
@@ -39,6 +42,23 @@
           <span aria-hidden="true">S</span> Platform status
         </a>
       </nav>
+
+      {% if active_page == 'chat' %}
+        <section class="sidebar-topics" aria-labelledby="test-topics-title">
+          <span id="test-topics-title">Test topics</span>
+          <button type="button" data-chat-topic="Ce documente sunt acceptate pentru deschiderea online a unui cont și care sunt sursele?"
+            data-use-rag="true">RAG + citations</button>
+          <button type="button" data-chat-topic="Formulează altfel întrebarea mea anterioară și continuă folosind contextul conversației."
+            data-use-rag="true">History + context</button>
+          <button type="button" data-chat-topic="Ce preferințe sau subiecte relevante îți amintești din celelalte sesiuni?"
+            data-shared-memory="true">Shared memory</button>
+          <button type="button" data-chat-topic="Verifică pe web dacă informațiile din răspunsul anterior sunt încă actuale."
+            data-fact-check="true">Web fact-check tool</button>
+          <button type="button" data-chat-topic="Analizează documentul atașat și oferă concluzii, riscuri și pașii următori.">Document analysis</button>
+          <button type="button" data-chat-topic="Răspunde scurt, apoi generează răspunsul și ca fișier audio."
+            data-delivery="speech">TTS delivery</button>
+        </section>
+      {% endif %}
 
       <div class="connection">
         <span class="connection-dot {{ 'online' if backend_online else '' }}"></span>

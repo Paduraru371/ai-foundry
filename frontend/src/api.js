@@ -30,6 +30,15 @@ export const api = {
 
   search: (payload) => request('/search', { method: 'POST', body: payload }),
   ask: (payload) => request('/ask', { method: 'POST', body: payload }),
+  sessions: () => request('/sessions'),
+  createSession: () => request('/sessions', {
+    method: 'POST',
+    body: { title: 'New conversation' },
+  }),
+  session: (id) => request(`/sessions/${encodeURIComponent(id)}`),
+  deleteSession: (id) => request(`/sessions/${encodeURIComponent(id)}`, {
+    method: 'DELETE',
+  }),
 
   agents: () => request('/agents'),
   agent: (name) => request(`/agents/${encodeURIComponent(name)}`),

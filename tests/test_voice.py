@@ -8,6 +8,7 @@ from unittest.mock import patch
 from fastapi import UploadFile
 
 from backend.api.routers.tools import speak, transcribe
+from backend.services import speech
 from backend.schemas import SpeakRequest
 
 
@@ -49,3 +50,15 @@ class SpeechToTextTests(IsolatedAsyncioTestCase):
             b"RIFF-browser-audio",
             content_type="audio/wav",
         )
+
+
+class SpeechHealthTests(TestCase):
+    def test_health_describes_tts_and_stt_separately(self) -> None:
+        with patch(
+            "backend.services.speech._credentials",
+            return_value=("secret", "https://speech.example", "westeurope"),
+        ):
+            result = speech.describe()
+
+        self.assertTrue(result["tts"]["configured"])
+        self.assertTrue(result["stt"]["configured"])

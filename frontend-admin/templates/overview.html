@@ -13,7 +13,8 @@
   {% for title, services in [
     ('Databases', catalog.databases),
     ('Language models', catalog.llms),
-    ('Embedding models', catalog.embeddings)
+    ('Embedding models', catalog.embeddings),
+    ('Speech services', catalog.speech)
   ] %}
     <section class="service-section" aria-labelledby="section-{{ loop.index }}">
       <header class="section-heading">
@@ -23,7 +24,7 @@
       <div class="status-grid">
         {% for service in services %}
           <article class="status-card status-card--{{ service.tone }}">
-            <span class="card-icon {{ 'green' if service.category == 'database' else ('violet' if service.category == 'llm' else 'blue') }}">
+            <span class="card-icon {{ 'green' if service.category == 'database' else ('violet' if service.category in ['llm', 'speech'] else 'blue') }}">
               {{ service.icon }}
             </span>
             <span class="card-label">{{ service.category | replace('llm', 'answer generation') | title }}</span>

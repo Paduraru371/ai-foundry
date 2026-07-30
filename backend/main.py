@@ -18,7 +18,8 @@ from .api.dependencies import (
     require_qdrant as _require_qdrant,
     store,
 )
-from .api.routers import agents, azure, generation, ops, rag, tools
+from .api.routers import agents, azure, documents, generation, ops, rag, sessions, tools
+from .api.routers.documents import extract_document
 from .api.routers.agents import (
     agent_deploy,
     agent_detail,
@@ -58,7 +59,9 @@ app.add_middleware(
 app.include_router(ops.router)
 app.include_router(azure.router)
 app.include_router(rag.router)
+app.include_router(documents.router)
 app.include_router(generation.router)
+app.include_router(sessions.router)
 app.include_router(agents.router)
 app.include_router(tools.router)
 
@@ -75,6 +78,7 @@ __all__ = [
     "collection_info",
     "collection_reset",
     "config",
+    "extract_document",
     "health",
     "ingest",
     "search",

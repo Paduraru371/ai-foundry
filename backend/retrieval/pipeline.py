@@ -8,6 +8,8 @@ STOP_WORDS = {
     "a", "an", "and", "are", "as", "at", "be", "by", "do", "does", "for",
     "from", "how", "i", "in", "is", "it", "of", "on", "or", "the", "to",
     "what", "when", "where", "which", "who", "why", "with",
+    "ai", "ale", "ca", "care", "ce", "cu", "de", "din", "este", "la",
+    "o", "pe", "pentru", "sau", "si", "sunt", "un",
 }
 
 
@@ -76,6 +78,7 @@ def diversify(
     *,
     duplicate_threshold: float = 0.82,
     diversity_penalty: float = 0.15,
+    max_per_source: int = 2,
 ) -> list[dict]:
     """Select relevant but non-repetitive passages with a small MMR-style penalty."""
     remaining = [dict(hit) for hit in hits]
@@ -83,6 +86,13 @@ def diversify(
     while remaining and len(selected) < top_k:
         candidates: list[tuple[float, dict]] = []
         for hit in remaining:
+            source = str(hit.get("source") or "")
+            same_source = sum(
+                str(chosen.get("source") or "") == source
+                for chosen in selected
+            )
+            if source and same_source >= max_per_source:
+                continue
             similarities = [
                 text_similarity(hit.get("text", ""), chosen.get("text", ""))
                 for chosen in selected
@@ -91,7 +101,11 @@ def diversify(
             if nearest >= duplicate_threshold:
                 continue
             quality = float(hit.get("rerank_score", hit.get("score", 0.0)))
-            candidates.append((quality - diversity_penalty * nearest, hit))
+            source_penalty = 0.04 * same_source
+            candidates.append((
+                quality - diversity_penalty * nearest - source_penalty,
+                hit,
+            ))
         if not candidates:
             break
         _, best = max(
@@ -114,6 +128,7 @@ def improve_retrieval(
     min_score: float,
     vector_weight: float = 0.75,
     duplicate_threshold: float = 0.82,
+    max_per_source: int = 2,
 ) -> list[dict]:
     """Apply the three Part 5 improvements in a stable, testable pipeline."""
     relevant = [
@@ -124,4 +139,5 @@ def improve_retrieval(
         ranked,
         top_k,
         duplicate_threshold=duplicate_threshold,
+        max_per_source=max_per_source,
     )

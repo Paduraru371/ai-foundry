@@ -24,6 +24,7 @@ class Settings(BaseSettings):
     chunk_strategy: str = "dynamic"        # static | dynamic | heading | sentence | semantic
     chunk_size: int = 500                  # target chunk size, characters
     chunk_overlap: int = 80                # characters carried over between chunks
+    chunk_min_size: int = 160              # merge undersized trailing chunks
     sentences_per_chunk: int = 3           # for the 'sentence' strategy
     semantic_threshold: float = 0.75       # cosine cut-off for the 'semantic' strategy
 
@@ -33,8 +34,22 @@ class Settings(BaseSettings):
     retrieval_candidate_pool: int = 10
     retrieval_vector_weight: float = 0.75
     retrieval_duplicate_threshold: float = 0.82
+    retrieval_max_per_source: int = 2
     llm_temperature: float = 0.2
     llm_max_tokens: int = 2500   # reasoning models spend part of this budget thinking
+    max_upload_bytes: int = 20 * 1024 * 1024
+    max_document_chars: int = 120_000
+
+    # --- persistent conversations and shared memory -------------------------
+    session_db_path: str = str(PROJECT_ROOT / "runtime" / "sessions.sqlite3")
+    chat_upload_dir: str = str(PROJECT_ROOT / "uploads")
+    history_max_messages: int = 16
+    history_max_tokens: int = 10_000
+    session_summary_max_chars: int = 4_000
+    shared_memory_max_chars: int = 5_000
+    shared_memory_session_limit: int = 4
+    shared_memory_candidate_limit: int = 12
+    shared_memory_min_score: float = 0.18
 
     # --- provider selection --------------------------------------------------
     llm_provider: str = "openai"            # lmstudio | openai | anthropic | azure
@@ -60,7 +75,9 @@ class Settings(BaseSettings):
 
     # --- Azure AI Speech (falls back to the Foundry resource when unset) -------
     azure_speech_key: str = ""
+    azure_speech_endpoint: str = ""
     azure_speech_region: str = ""              # e.g. swedencentral
+    azure_resource_id: str = ""
     azure_speech_voice: str = "en-US-AvaMultilingualNeural"
     azure_speech_language: str = "en-US"
 
@@ -68,7 +85,7 @@ class Settings(BaseSettings):
     azure_resource_group: str = ""
     azure_foundry_resource: str = ""
     azure_foundry_project: str = ""
-    azure_location: str = "swedencentral"
+    azure_location: str = "francecentral"
 
     # --- LM Studio (local, free — OpenAI-compatible server) ------------------
     lmstudio_base_url: str = "http://localhost:1234/v1"
@@ -90,6 +107,11 @@ class Settings(BaseSettings):
     azure_ai_api_key: str = ""             # only when azure_ai_auth=key
     azure_ai_chat_deployment: str = "gpt-5-mini"
     azure_ai_embedding_deployment: str = "text-embedding-3-small"
+    # Editable because Azure pricing varies by deployment type/region and changes.
+    # Defaults are the public GPT-5-mini Global Standard rates, per 1M tokens.
+    azure_gpt5_mini_input_price: float = 0.25
+    azure_gpt5_mini_cached_input_price: float = 0.025
+    azure_gpt5_mini_output_price: float = 2.00
 
 
 settings = Settings()

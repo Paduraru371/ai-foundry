@@ -27,7 +27,27 @@
     <header class="panel-header">
       <div><span class="eyebrow">POST /chunk &amp; /ingest</span><h2>New document</h2></div>
     </header>
-    <form method="post">
+    <form method="post" enctype="multipart/form-data">
+      <div class="upload-zone">
+        <label class="grow">
+          Upload a document
+          <input name="file" type="file"
+            accept=".pdf,.doc,.docx,.ppt,.pptx,.txt,.md,.csv,.json,.xml,.yaml,.yml,.html,.htm,.rtf,.log,.py,.js,.ts,.java,.c,.cpp,.sql">
+          <span class="field-hint">PDF, DOCX, PPTX and text/code formats · maximum 20 MB</span>
+        </label>
+        <button class="button secondary" formaction="/knowledge/extract" formnovalidate>
+          Extract text
+        </button>
+      </div>
+      {% if extracted %}
+        <div class="document-summary">
+          <strong>{{ extracted.filename }}</strong>
+          <span>{{ extracted.characters }} characters · ~{{ extracted.estimated_tokens }} tokens
+            {% if extracted.pages_or_slides %} · {{ extracted.pages_or_slides }} pages/slides{% endif %}
+          </span>
+          {% for warning in extracted.warnings %}<small>{{ warning }}</small>{% endfor %}
+        </div>
+      {% endif %}
       <label>
         Document content
         <textarea name="text" rows="9" required

@@ -67,6 +67,7 @@ def chunk_heading(
     size: int,
     overlap: int,
     document_title: str | None = None,
+    min_size: int = 0,
 ) -> list[str]:
     """Split Markdown by heading and add document, hierarchy, and order."""
     metadata_title, body = frontmatter_title(text)
@@ -89,6 +90,7 @@ def chunk_heading(
                 section_body,
                 content_budget,
                 min(overlap, content_budget - 1),
+                min(min_size, content_budget),
             )
             if section_body
             else [""]

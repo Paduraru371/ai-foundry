@@ -128,9 +128,35 @@ def build_service_catalog(
         detail="Vector database reachable" if qdrant_ok else "Vector database is not reachable",
         icon="DB",
     )
+    speech = (health or {}).get("speech", {})
+
+    def speech_service(capability: str, label: str, icon: str) -> ServiceStatus:
+        values = speech.get(capability, {})
+        configured = bool(values.get("configured", speech.get("configured", False)))
+        return ServiceStatus(
+            category="speech",
+            provider=label,
+            model=str(
+                speech.get("voice")
+                if capability == "tts"
+                else speech.get("region") or speech.get("endpoint") or "Azure Speech"
+            ),
+            status="Configured" if configured else "Not configured",
+            tone="configured" if configured else "error",
+            detail=str(
+                values.get("detail")
+                or speech.get("source")
+                or "Azure Speech credentials or endpoint missing"
+            ),
+            icon=icon,
+        )
 
     return {
         "databases": [database],
         "llms": _model_services("llm", health, config),
         "embeddings": _model_services("embeddings", health, config),
+        "speech": [
+            speech_service("tts", "Text to speech", "TTS"),
+            speech_service("stt", "Speech to text", "STT"),
+        ],
     }

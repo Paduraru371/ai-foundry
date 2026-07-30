@@ -25,7 +25,7 @@ const CANDIDATES = [
 // Every backend route the console uses. Proxied so there is no CORS to configure.
 const ROUTES = [
   '/health', '/config', '/azure',
-  '/chunk', '/ingest', '/collection', '/search', '/ask',
+  '/chunk', '/ingest', '/collection', '/search', '/ask', '/sessions',
   '/agents', '/tools',
 ]
 

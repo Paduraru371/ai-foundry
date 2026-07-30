@@ -33,6 +33,8 @@ services:
       AZURE_AI_AUTH: ${DOCKER_AZURE_AI_AUTH:-key}
     volumes:
       - ../../backend:/srv/backend
+      - ../../uploads:/srv/uploads
+      - ../../runtime:/srv/runtime
     depends_on:
       - qdrant
     extra_hosts:

@@ -60,6 +60,24 @@ class VectorStore:
     # --- data ----------------------------------------------------------------
     def upsert(self, chunks: list[str], vectors: list[list[float]], strategy: str,
                source: str | None) -> list[str]:
+        source_name = source.strip() if source and source.strip() else None
+        old_ids: set[str] = set()
+        if source_name:
+            points, _ = self.client.scroll(
+                collection_name=self.collection,
+                scroll_filter=models.Filter(
+                    must=[
+                        models.FieldCondition(
+                            key="source",
+                            match=models.MatchValue(value=source_name),
+                        )
+                    ]
+                ),
+                limit=10_000,
+                with_payload=False,
+                with_vectors=False,
+            )
+            old_ids = {str(point.id) for point in points}
         ids = [stable_chunk_id(source, index) for index in range(len(chunks))]
         now = datetime.now(timezone.utc).isoformat(timespec="seconds")
         self.client.upsert(
@@ -78,7 +96,15 @@ class VectorStore:
                 )
                 for i, (pid, text, vec) in enumerate(zip(ids, chunks, vectors))
             ],
+            wait=True,
         )
+        stale_ids = old_ids - set(ids)
+        if stale_ids:
+            self.client.delete(
+                collection_name=self.collection,
+                points_selector=models.PointIdsList(points=list(stale_ids)),
+                wait=True,
+            )
         return ids
 
     def search(self, vector: list[float], top_k: int) -> list[dict]:

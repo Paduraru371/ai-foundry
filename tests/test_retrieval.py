@@ -65,6 +65,25 @@ class RetrievalImprovementTests(unittest.TestCase):
             {"first", "different"},
         )
 
+    def test_diversity_limits_one_source_from_dominating_context(self) -> None:
+        hits = rerank("onboarding documents fees", [
+            hit("same-a", 0.90, "Onboarding documents are required."),
+            hit("same-b", 0.89, "Onboarding fees are listed here."),
+            hit("same-c", 0.88, "Onboarding eligibility applies."),
+            hit("other", 0.70, "Identity verification uses a video call."),
+        ])
+        for item in hits:
+            if item["id"].startswith("same"):
+                item["source"] = "one-document"
+
+        result = diversify(hits, top_k=4, max_per_source=2)
+
+        self.assertLessEqual(
+            sum(item["source"] == "one-document" for item in result),
+            2,
+        )
+        self.assertIn("other", {item["id"] for item in result})
+
     def test_llm_reranker_uses_model_order(self) -> None:
         class FakeResult:
             text = "[2, 1]"

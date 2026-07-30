@@ -53,14 +53,16 @@ def rerank_with_llm(
     top_k: int,
     *,
     llm=None,
-) -> list[dict]:
+    return_usage: bool = False,
+) -> list[dict] | tuple[list[dict], object | None]:
     """Ask the configured model to choose the final context passages.
 
     Provider errors or malformed model output fall back to the already improved
     deterministic order, so retrieval remains available.
     """
     if len(hits) <= top_k:
-        return hits
+        return (hits, None) if return_usage else hits
+    result = None
     try:
         model = llm or get_llm()
         result = model.chat(
@@ -73,7 +75,8 @@ def rerank_with_llm(
     except Exception:
         indexes = []
     if not indexes:
-        return hits[:top_k]
+        selected = hits[:top_k]
+        return (selected, result) if return_usage else selected
     selected = [hits[index] for index in indexes]
     if len(selected) < top_k:
         selected_ids = {item["id"] for item in selected}
@@ -81,4 +84,5 @@ def rerank_with_llm(
             hit for hit in hits
             if hit["id"] not in selected_ids
         )
-    return selected[:top_k]
+    selected = selected[:top_k]
+    return (selected, result) if return_usage else selected
