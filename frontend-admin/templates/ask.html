@@ -118,7 +118,10 @@
         </div>
         <span class="model-badge">✦ {{ result.provider }} · {{ result.model }}</span>
       </header>
-      <div class="answer-box"><span>AI</span><p>{{ result.answer }}</p></div>
+      <div class="answer-box">
+        <span>AI</span>
+        <div id="ask-answer-content" class="answer-content"></div>
+      </div>
       <div class="voice-controls">
         <button id="play-answer" class="button secondary" type="button">
           Play answer
@@ -356,6 +359,9 @@
       });
 
       const answerText = {{ (result.answer if result else "") | tojson }};
+      const answerFormat = {{ (result.response_format if result else "plain") | tojson }};
+      const answerContent = document.getElementById("ask-answer-content");
+      if (answerContent) AnswerFormatting.render(answerContent, answerText, answerFormat);
       const autoSpeak = {{ (speak_answer if speak_answer is defined else false) | tojson }};
       const playButton = document.getElementById("play-answer");
       const audio = document.getElementById("answer-audio");

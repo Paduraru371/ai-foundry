@@ -104,6 +104,20 @@ class GenerationOptionTests(unittest.TestCase):
 
         self.assertIn("valid JSON only", task)
 
+    def test_structured_formats_demand_consistent_markdown(self) -> None:
+        bullets = _analysis_task(AskRequest(
+            question="Summarize",
+            response_format="bullet_list",
+        ))
+        table = _analysis_task(AskRequest(
+            question="Compare",
+            response_format="table",
+        ))
+
+        self.assertIn("one factual point per item", bullets)
+        self.assertIn("same number of cells in every row", table)
+        self.assertIn("escape a literal pipe", table)
+
     def test_motrun_unsupported_answer_uses_safe_human_handoff(self) -> None:
         answer = _unsupported_answer(
             "Care sunt documentele pentru acest caz?",

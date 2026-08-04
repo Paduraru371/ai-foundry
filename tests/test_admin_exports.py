@@ -36,6 +36,9 @@ class AdminDocumentExportTests(unittest.TestCase):
         base_template = (
             ADMIN_ROOT / "templates" / "base.html"
         ).read_text(encoding="utf-8")
+        formatting_script = (
+            ADMIN_ROOT / "static" / "answer-formatting.js"
+        ).read_text(encoding="utf-8")
 
         self.assertIn('id="chat-record"', chat_template)
         self.assertIn('id="chat-send"', chat_template)
@@ -89,6 +92,11 @@ class AdminDocumentExportTests(unittest.TestCase):
         self.assertIn("message.artifacts?.length", chat_template)
         self.assertIn('fetch("/chat/transcribe"', chat_template)
         self.assertIn("data-chat-topic", base_template)
+        self.assertIn("answer-formatting.js", base_template)
+        self.assertIn("AnswerFormatting.render", chat_template)
+        self.assertIn('document.createElement("table")', formatting_script)
+        self.assertIn('document.createElement(type)', formatting_script)
+        self.assertNotIn("innerHTML", formatting_script)
         self.assertIn(
             "/chat/transcribe",
             {route.path for route in app.routes},

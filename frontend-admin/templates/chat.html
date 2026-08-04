@@ -393,7 +393,13 @@
           const answerParts = message.role === "assistant"
             ? splitAnswerNotes(message.content)
             : { answer: message.content, notes: [] };
-          card.append(head, element("div", "chat-message-content", answerParts.answer));
+          const answerContent = element("div", "chat-message-content");
+          AnswerFormatting.render(
+            answerContent,
+            answerParts.answer,
+            message.responseFormat || "plain",
+          );
+          card.append(head, answerContent);
           const answerNotes = [...answerParts.notes];
           if (message.role === "assistant"
               && !answerNotes.some((note) => /(?:nivel\s+de\s+)?[îi]ncredere|confidence/i.test(note))) {
@@ -798,6 +804,7 @@
             memory: result.memory,
             toolPlan: result.tool_plan,
             toolResults: result.tool_results || [],
+            responseFormat: result.response_format || "plain",
           });
           const artifactKinds = new Set(
             (result.artifacts || (result.artifact ? [result.artifact] : []))
@@ -863,6 +870,7 @@
           },
           toolPlan: metadata.tool_plan,
           toolResults: metadata.tool_results || [],
+          responseFormat: metadata.response_format || "plain",
         };
       }
 

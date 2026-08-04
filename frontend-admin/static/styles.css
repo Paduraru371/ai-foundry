@@ -272,6 +272,45 @@ input:focus, textarea:focus, select:focus { border-color: var(--violet); box-sha
 }
 .message-action:hover { border-color: #c8b6f5; background: var(--violet-light); color: var(--violet); }
 .chat-message-content { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 14px; line-height: 1.65; }
+.chat-message-content.formatted-bullets,
+.chat-message-content.formatted-table,
+.answer-content.formatted-bullets,
+.answer-content.formatted-table { white-space: normal; }
+.answer-content { min-width: 0; flex: 1; line-height: 1.65; }
+.answer-content > p,
+.chat-message-content > p { margin: 0 0 10px; }
+.answer-list { margin: 3px 0; padding-left: 22px; }
+.answer-list > li { margin: 7px 0; padding-left: 3px; }
+.answer-list > li::marker { color: var(--violet); font-weight: 750; }
+.answer-sublist { margin: 5px 0 2px; padding-left: 21px; }
+.answer-sublist > li { margin: 4px 0; }
+.answer-table-wrap {
+  width: 100%; max-width: 100%; overflow-x: auto; border: 1px solid var(--line);
+  border-radius: 10px; background: #fff; outline: none;
+}
+.answer-table-wrap:focus-visible { box-shadow: 0 0 0 3px rgba(109, 40, 217, .13); }
+.answer-table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 12px; }
+.answer-table th,
+.answer-table td {
+  min-width: 110px; padding: 10px 12px; border-right: 1px solid var(--line);
+  border-bottom: 1px solid var(--line); vertical-align: top; text-align: left;
+  overflow-wrap: anywhere;
+}
+.answer-table th:last-child,
+.answer-table td:last-child { border-right: 0; }
+.answer-table tbody tr:last-child td { border-bottom: 0; }
+.answer-table th {
+  position: sticky; top: 0; background: var(--violet-light); color: var(--navy);
+  font-weight: 750; white-space: nowrap;
+}
+.answer-table tbody tr:nth-child(even) td { background: #fafafe; }
+.answer-table tbody tr:hover td { background: #f6f2ff; }
+.answer-table .align-center { text-align: center; }
+.answer-table .align-right { text-align: right; }
+@media (max-width: 600px) {
+  .answer-table th, .answer-table td { min-width: 95px; padding: 8px 9px; }
+  .answer-list { padding-left: 19px; }
+}
 .chat-message-meta { margin-top: 10px; color: var(--muted); font-size: 10px; }
 .chat-fact-check {
   margin-top: 10px; padding: 9px 11px; border-left: 3px solid var(--green);

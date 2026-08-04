@@ -36,8 +36,17 @@ NUMERIC_CITATION = re.compile(r"\[\s*(\d+)\s*\]")
 FORMAT_INSTRUCTIONS = {
     "plain": "Use clear plain text.",
     "markdown": "Return well-structured Markdown with concise headings where useful.",
-    "bullet_list": "Return a concise bullet list. Avoid introductory filler.",
-    "table": "Return the answer as a Markdown table. Add a short note only if essential.",
+    "bullet_list": (
+        "Return a clean Markdown bullet list with no heading or introductory filler. "
+        "Start every primary item with `- `. Put one factual point per item and keep "
+        "its citation on that same item. Use at most one nested level, indented by two spaces."
+    ),
+    "table": (
+        "Return one valid GitHub-Flavored Markdown table. Use a descriptive header row, "
+        "a separator row such as `|---|---|`, and the same number of cells in every row. "
+        "Keep cells concise, do not use multiline cells, and escape a literal pipe as `\\|`. "
+        "Add text outside the table only when one essential qualification is required."
+    ),
     "json": (
         "Return valid JSON only, with no Markdown fence. Use descriptive keys and "
         "include an `answer` field."
@@ -409,6 +418,7 @@ def _run_generation(req: AskRequest, cancellation=None) -> AskResponse:
                             "reason": "no_relevant_context",
                         },
                         "memory": memory_info.model_dump(),
+                        "response_format": req.response_format,
                         "tool_plan": tool_plan.as_dict(),
                         "tool_results": [result.as_dict() for result in tool_results],
                     },
@@ -579,6 +589,7 @@ def _run_generation(req: AskRequest, cancellation=None) -> AskResponse:
                 "augmented": req.use_rag,
                 "sources": [hit.model_dump() for hit in retrieved],
                 "memory": memory_info.model_dump(),
+                "response_format": req.response_format,
                 "tool_plan": tool_plan.as_dict(),
                 "tool_results": [result.as_dict() for result in tool_results],
             },
