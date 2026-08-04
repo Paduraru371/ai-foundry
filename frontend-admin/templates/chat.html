@@ -7,6 +7,10 @@
       <p>Keep in mind that chatbots might do mistakes.</p>
     </div>
   </header>
+  <button id="toggle-left-panel" class="chat-edge-toggle chat-edge-left" type="button"
+    aria-label="Hide left panel" title="Hide left panel">‹</button>
+  <button id="toggle-right-panel" class="chat-edge-toggle chat-edge-right" type="button"
+    aria-label="Hide right panel" title="Hide right panel">›</button>
 
   <form id="chat-form" class="chat-workspace" enctype="multipart/form-data">
     <section class="chat-panel">
@@ -28,6 +32,19 @@
             </label>
             <button id="chat-record" class="button secondary microphone-button" type="button"
               aria-label="Start microphone" title="Ask using the microphone">● Microphone</button>
+            <label class="chat-format-control" title="Choose how the answer is structured">
+              <span class="visually-hidden">Content formatting</span>
+              <select name="response_format" aria-label="Content formatting">
+                <option value="plain">Plain text</option>
+                <option value="markdown">Markdown</option>
+                <option value="bullet_list">Bullet list</option>
+                <option value="table">Table</option>
+                <option value="json">JSON</option>
+                <option value="executive_summary">Executive summary</option>
+                <option value="technical_report">Technical report</option>
+              </select>
+              <input name="apply_response_format" type="hidden" value="true">
+            </label>
             <button id="chat-send" class="button primary" type="button">Send message →</button>
           </div>
         </div>
@@ -58,19 +75,14 @@
         </div>
       </section>
 
-      <section class="chat-control-card">
-        <span class="eyebrow">Answer settings</span>
+      <section class="chat-control-card chat-response-panel">
+        <span class="eyebrow">Response controls</span>
         <p class="chat-settings-hint">
-          Check a setting to enforce it. Changing its value checks it automatically.
-          Instructions written in the message have priority.
+          Choose the response defaults. Instructions written in the message have priority.
         </p>
         <div class="chat-settings">
-          <label class="chat-optional-setting" data-optional-setting>
-            <span class="chat-setting-title">
-              Agent
-              <input class="chat-setting-apply" name="apply_agent"
-                type="checkbox" value="true" aria-label="Apply selected agent">
-            </span>
+          <label class="chat-optional-setting applied">
+            <span class="chat-setting-title">Agent</span>
             <select id="chat-agent" name="agent">
               {% for item in agents %}
                 <option value="{{ item.name }}" data-runs-on="{{ item.runs_on }}"
@@ -85,71 +97,23 @@
                 </optgroup>
               {% endif %}
             </select>
+            <input name="apply_agent" type="hidden" value="true">
           </label>
-          <label class="chat-optional-setting" data-optional-setting>
-            <span class="chat-setting-title">
-              Execution
-              <input class="chat-setting-apply" name="apply_agent_mode"
-                type="checkbox" value="true" aria-label="Apply execution mode">
-            </span>
+          <label class="chat-optional-setting applied">
+            <span class="chat-setting-title">Execution</span>
             <select id="chat-agent-mode" name="agent_mode">
               <option value="local" {{ 'selected' if agent_mode == 'local' else '' }}>Local agent</option>
               <option id="chat-foundry-option" value="foundry"
                 {{ 'selected' if agent_mode == 'foundry' else '' }}>Foundry agent</option>
             </select>
+            <input name="apply_agent_mode" type="hidden" value="true">
           </label>
-          <label class="chat-optional-setting" data-optional-setting>
-            <span class="chat-setting-title">
-              Content formatting
-              <input class="chat-setting-apply" name="apply_response_format"
-                type="checkbox" value="true" aria-label="Apply content formatting">
-            </span>
-            <select name="response_format">
-              <option value="plain">Plain text</option>
-              <option value="markdown">Markdown</option>
-              <option value="bullet_list">Bullet list</option>
-              <option value="table">Table</option>
-              <option value="json">JSON</option>
-              <option value="executive_summary">Executive summary</option>
-              <option value="technical_report">Technical report</option>
-            </select>
-          </label>
-          <label id="chat-document-type" class="chat-optional-setting"
-            data-optional-setting>
-            <span class="chat-setting-title">
-              Generated file type
-              <input class="chat-setting-apply" name="apply_document_type"
-                type="checkbox" value="true" aria-label="Apply generated file type">
-            </span>
-            <select name="document_type">
-              <option value="pdf">PDF document (.pdf)</option>
-              <option value="docx">Word document (.docx)</option>
-              <option value="pptx">PowerPoint presentation (.pptx)</option>
-              <option value="txt">Plain text file (.txt)</option>
-              <option value="md">Markdown file (.md)</option>
-              <option value="json">JSON file (.json)</option>
-            </select>
-          </label>
-          <label class="chat-optional-setting" data-optional-setting>
-            <span class="chat-setting-title">
-              Deliver as
-              <input class="chat-setting-apply" name="apply_delivery"
-                type="checkbox" value="true" aria-label="Apply delivery type">
-            </span>
-            <select id="chat-delivery" name="delivery">
-              <option value="conversation">Conversation response</option>
-              <option value="speech">Speech / audio</option>
-              <option value="document">Generated document</option>
-              <option value="speech_document">Audio + generated document</option>
-            </select>
-          </label>
-          <label class="chat-optional-setting" data-optional-setting>
-            <span class="chat-setting-title">
-              Top K
-              <input class="chat-setting-apply" name="apply_top_k"
-                type="checkbox" value="true" aria-label="Apply Top K">
-            </span>
-            <input name="top_k" type="number" min="1" max="50" value="3">
+          <label class="chat-optional-setting applied">
+            <span class="chat-setting-title">Top K</span>
+            <input id="chat-top-k" name="top_k" type="text" inputmode="numeric"
+              pattern="[1-9]|[1-4][0-9]|50" maxlength="2" value="3"
+              aria-label="Top K, a number from 1 to 50" autocomplete="off">
+            <input name="apply_top_k" type="hidden" value="true">
           </label>
           <label class="checkbox chat-check">
             <input name="use_rag" type="checkbox" value="true" checked>
@@ -203,6 +167,7 @@
     (() => {
       const storageKey = "libra-admin-chat-v1";
       const sessionStorageKey = "libra-admin-session-v1";
+      const layoutStorageKey = "libra-admin-chat-layout-v1";
       const form = document.getElementById("chat-form");
       const input = document.getElementById("chat-input");
       const messagesElement = document.getElementById("chat-messages");
@@ -210,8 +175,6 @@
       const send = document.getElementById("chat-send");
       const file = document.getElementById("chat-file");
       const fileNote = document.getElementById("chat-file-note");
-      const delivery = document.getElementById("chat-delivery");
-      const documentType = document.getElementById("chat-document-type");
       const agent = document.getElementById("chat-agent");
       const agentMode = document.getElementById("chat-agent-mode");
       const foundryOption = document.getElementById("chat-foundry-option");
@@ -225,6 +188,10 @@
       const sourceDownload = document.getElementById("chat-source-download");
       const sourceFormat = document.getElementById("chat-source-format");
       const sourceClose = document.getElementById("chat-source-close");
+      const leftPanelButton = document.getElementById("toggle-left-panel");
+      const rightPanelButton = document.getElementById("toggle-right-panel");
+      const topKInput = document.getElementById("chat-top-k");
+      const compactLayout = window.matchMedia("(max-width: 1100px)");
       const foundryAvailable = {{ (foundry.available if foundry else false) | tojson }};
       let messages = [];
       let sessionId = localStorage.getItem(sessionStorageKey) || "";
@@ -236,6 +203,49 @@
         content: "Ready to answer.",
         tone: "ready",
       };
+      let panelLayout = { left: true, right: true };
+      let compactLeftRevealed = false;
+      try {
+        panelLayout = { ...panelLayout, ...JSON.parse(localStorage.getItem(layoutStorageKey) || "{}") };
+      } catch (_error) {
+        localStorage.removeItem(layoutStorageKey);
+      }
+
+      function applyPanelLayout() {
+        const leftVisible = compactLayout.matches ? compactLeftRevealed : panelLayout.left;
+        document.body.classList.toggle("chat-left-hidden", !leftVisible);
+        document.body.classList.toggle("chat-right-hidden", !panelLayout.right);
+        leftPanelButton.textContent = leftVisible ? "‹" : "›";
+        rightPanelButton.textContent = panelLayout.right ? "›" : "‹";
+        leftPanelButton.title = leftVisible ? "Hide left panel" : "Show left panel";
+        rightPanelButton.title = panelLayout.right ? "Hide right panel" : "Show right panel";
+        leftPanelButton.setAttribute("aria-label", leftPanelButton.title);
+        rightPanelButton.setAttribute("aria-label", rightPanelButton.title);
+        leftPanelButton.setAttribute("aria-pressed", String(!leftVisible));
+        rightPanelButton.setAttribute("aria-pressed", String(!panelLayout.right));
+        localStorage.setItem(layoutStorageKey, JSON.stringify(panelLayout));
+      }
+
+      leftPanelButton.addEventListener("click", () => {
+        if (compactLayout.matches) compactLeftRevealed = !compactLeftRevealed;
+        else panelLayout.left = !panelLayout.left;
+        applyPanelLayout();
+      });
+      rightPanelButton.addEventListener("click", () => {
+        panelLayout.right = !panelLayout.right;
+        applyPanelLayout();
+      });
+      compactLayout.addEventListener("change", () => {
+        compactLeftRevealed = false;
+        applyPanelLayout();
+      });
+      topKInput.addEventListener("input", () => {
+        topKInput.value = topKInput.value.replace(/\D/g, "").slice(0, 2);
+      });
+      topKInput.addEventListener("blur", () => {
+        topKInput.value = String(Math.min(50, Math.max(1, Number(topKInput.value) || 3)));
+      });
+      applyPanelLayout();
 
       function persist() {
         localStorage.setItem(storageKey, JSON.stringify(messages.slice(-40)));
@@ -253,6 +263,47 @@
         return Number(value || 0).toLocaleString();
       }
 
+      function splitAnswerNotes(content) {
+        const notePattern = /^(Not[ăa]\s+esen[țt]ial[ăa]|Noti[țt]e|Note|Nivel\s+de\s+[îi]ncredere|[îi]ncredere)\s*:/i;
+        const answer = [];
+        const notes = [];
+        String(content || "").split("\n").forEach((line) => {
+          if (notePattern.test(line.trim())) notes.push(line.trim());
+          else answer.push(line);
+        });
+        return { answer: answer.join("\n").trim(), notes };
+      }
+
+      function fallbackConfidence(message) {
+        const romanian = /[ăâîșț]/i.test(message.content)
+          || /\b(care|este|sunt|pentru|documente|trebuie)\b/i.test(message.content);
+        let level = "unspecified";
+        const factConfidence = String(message.factCheck?.confidence || "").toLowerCase();
+        if (["high", "medium", "low"].includes(factConfidence)) level = factConfidence;
+        else if (message.guardrail?.status === "passed") level = "high";
+        else if (message.guardrail) level = "low";
+        else if (message.augmented || message.sources?.length) level = "medium";
+        const localized = romanian
+          ? { high: "ridicată", medium: "medie", low: "scăzută", unspecified: "nespecificată" }
+          : { high: "high", medium: "medium", low: "low", unspecified: "unspecified" };
+        return `${romanian ? "Încredere" : "Confidence"}: ${localized[level]}.`;
+      }
+
+      async function createAnswerArtifact(message, kind, documentType = "pdf") {
+        const body = new FormData();
+        body.set("answer", message.content);
+        if (kind === "document") body.set("document_type", documentType);
+        const endpoint = kind === "speech" ? "/chat/answer/speech" : "/chat/answer/document";
+        const result = await requestJson(endpoint, { method: "POST", body });
+        message.artifacts = [...(message.artifacts || []), result.artifact];
+        persist();
+        render();
+        if (kind === "speech") {
+          const players = messagesElement.querySelectorAll("article audio");
+          players[players.length - 1]?.play().catch(() => {});
+        }
+      }
+
       function setActivity(content, tone = "ready") {
         activityMessage = { content, tone };
         status.textContent = content;
@@ -260,7 +311,9 @@
       }
 
       function fillComposer(message) {
-        input.value = message.content;
+        input.value = message.role === "assistant"
+          ? splitAnswerNotes(message.content).answer
+          : message.content;
         input.focus();
         input.setSelectionRange(input.value.length, input.value.length);
         setActivity("Editing a copy of this message. Send it when ready.", "ready");
@@ -337,7 +390,18 @@
           editButton.addEventListener("click", () => fillComposer(message));
           actions.append(copyButton, editButton);
           head.append(identity, actions);
-          card.append(head, element("div", "chat-message-content", message.content));
+          const answerParts = message.role === "assistant"
+            ? splitAnswerNotes(message.content)
+            : { answer: message.content, notes: [] };
+          card.append(head, element("div", "chat-message-content", answerParts.answer));
+          const answerNotes = [...answerParts.notes];
+          if (message.role === "assistant"
+              && !answerNotes.some((note) => /(?:nivel\s+de\s+)?[îi]ncredere|confidence/i.test(note))) {
+            answerNotes.push(fallbackConfidence(message));
+          }
+          answerNotes.forEach((note) => {
+            card.append(element("div", "chat-message-meta chat-answer-note", note));
+          });
 
           if (message.usage) {
             const usage = message.usage;
@@ -381,11 +445,16 @@
             ));
           }
           if (message.guardrail) {
+            const guardrailReason = String(message.guardrail.reason || "");
+            const guardrailPassed = message.guardrail.status === "passed"
+              && !guardrailReason.startsWith("auditor_");
             card.append(element(
               "div",
-              `chat-guardrail ${message.guardrail.status || ""}`,
-              `Grounding guardrail: ${message.guardrail.status || "checked"}`
-              + (message.guardrail.reason ? ` · ${message.guardrail.reason.replaceAll("_", " ")}` : ""),
+              `chat-guardrail ${guardrailPassed ? "passed" : "failed"}`,
+              `Grounding guardrail: ${guardrailPassed ? "passed" : "not passed"}`
+              + (!guardrailPassed && message.guardrail.status
+                ? ` · ${message.guardrail.status.replaceAll("_", " ")}` : "")
+              + (guardrailReason ? ` · ${guardrailReason.replaceAll("_", " ")}` : ""),
             ));
           }
           if (message.augmented) {
@@ -438,6 +507,40 @@
               card.append(link);
             }
           });
+          if (message.role === "assistant") {
+            const answerTools = element("div", "chat-answer-tools");
+            const speechButton = element("button", "button secondary small chat-speech-button", "▶ Speech");
+            speechButton.type = "button";
+            speechButton.title = "Read this response aloud";
+            speechButton.addEventListener("click", async () => {
+              speechButton.disabled = true;
+              speechButton.textContent = "Preparing audio…";
+              try { await createAnswerArtifact(message, "speech"); }
+              catch (error) { setActivity(`Speech failed: ${error.message}`, "error"); render(); }
+            });
+            const exportGroup = element("div", "chat-answer-export");
+            const typeSelect = document.createElement("select");
+            typeSelect.setAttribute("aria-label", "Document type");
+            [
+              ["pdf", "PDF"], ["docx", "Word"], ["pptx", "PowerPoint"],
+              ["txt", "Text"], ["md", "Markdown"], ["json", "JSON"],
+            ].forEach(([value, label]) => {
+              const option = element("option", "", label);
+              option.value = value;
+              typeSelect.append(option);
+            });
+            const exportButton = element("button", "button secondary small", "Generate document");
+            exportButton.type = "button";
+            exportButton.addEventListener("click", async () => {
+              exportButton.disabled = true;
+              exportButton.textContent = "Generating…";
+              try { await createAnswerArtifact(message, "document", typeSelect.value); }
+              catch (error) { setActivity(`Document failed: ${error.message}`, "error"); render(); }
+            });
+            exportGroup.append(typeSelect, exportButton);
+            answerTools.append(speechButton, exportGroup);
+            card.append(answerTools);
+          }
           messagesElement.append(card);
         });
         if (activityMessage) {
@@ -450,16 +553,6 @@
           messagesElement.append(activity);
         }
         messagesElement.scrollTop = messagesElement.scrollHeight;
-      }
-
-      function updateDelivery() {
-        const documentDelivery = ["document", "speech_document"].includes(delivery.value);
-        documentType.classList.toggle("delivery-active", documentDelivery);
-      }
-
-      function updateOptionalSetting(setting) {
-        const checkbox = setting.querySelector(".chat-setting-apply");
-        setting.classList.toggle("applied", Boolean(checkbox?.checked));
       }
 
       sourceClose.addEventListener("click", () => sourceDialog.close());
@@ -848,23 +941,6 @@
           ? `${file.files[0].name} · ${(file.files[0].size / 1024).toFixed(1)} KB`
           : "PDF, DOCX, PPTX and text/code · maximum 20 MB";
       });
-      document.querySelectorAll("[data-optional-setting]").forEach((setting) => {
-        const checkbox = setting.querySelector(".chat-setting-apply");
-        const control = setting.querySelector("select, input[type='number']");
-        checkbox?.addEventListener("change", () => updateOptionalSetting(setting));
-        control?.addEventListener("change", () => {
-          if (checkbox) checkbox.checked = true;
-          updateOptionalSetting(setting);
-          if (control.name === "document_type") {
-            delivery.value = "document";
-            form.elements.apply_delivery.checked = true;
-            updateOptionalSetting(delivery.closest("[data-optional-setting]"));
-            updateDelivery();
-          }
-        });
-        updateOptionalSetting(setting);
-      });
-      delivery.addEventListener("change", updateDelivery);
       agent.addEventListener("change", updateAgentMode);
       sessionSelect.addEventListener("change", async () => {
         await loadSession(sessionSelect.value);
@@ -902,16 +978,9 @@
           if (button.dataset.factCheck) {
             form.elements.fact_check.checked = button.dataset.factCheck === "true";
           }
-          if (button.dataset.delivery) {
-            delivery.value = button.dataset.delivery;
-            form.elements.apply_delivery.checked = true;
-            updateOptionalSetting(delivery.closest("[data-optional-setting]"));
-            updateDelivery();
-          }
           input.focus();
         });
       });
-      updateDelivery();
       updateAgentMode();
       render();
       sessionReady = initializeSession();

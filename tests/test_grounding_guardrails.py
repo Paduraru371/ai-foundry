@@ -76,7 +76,7 @@ class GroundingGuardrailTests(unittest.TestCase):
         )
 
         self.assertEqual(review.answer, "Este necesar actul de identitate. [1]")
-        self.assertEqual(review.details["status"], "passed")
+        self.assertEqual(review.details["status"], "audit_failed")
         self.assertEqual(
             review.details["reason"],
             "auditor_rewrite_failed_validation",
@@ -95,7 +95,7 @@ class GroundingGuardrailTests(unittest.TestCase):
         review = self._review("not-json")
 
         self.assertEqual(review.answer, "Este necesar actul de identitate. [1]")
-        self.assertEqual(review.details["status"], "passed")
+        self.assertEqual(review.details["status"], "audit_failed")
         self.assertEqual(review.details["reason"], "auditor_invalid_output")
 
     def test_auditor_failure_is_reported_and_fails_open(self) -> None:
@@ -112,7 +112,7 @@ class GroundingGuardrailTests(unittest.TestCase):
             )
 
         self.assertEqual(review.answer, "Este necesar actul de identitate. [1]")
-        self.assertEqual(review.details["status"], "passed")
+        self.assertEqual(review.details["status"], "audit_failed")
         self.assertEqual(review.details["reason"], "auditor_unavailable")
 
     def test_fail_closed_remains_available_as_an_option(self) -> None:

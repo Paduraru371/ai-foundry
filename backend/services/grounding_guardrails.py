@@ -86,7 +86,7 @@ def _audit_failure(
 ) -> GuardrailReview:
     fail_closed = settings.grounding_guardrail_fail_closed
     metadata = {
-        "status": "handoff" if fail_closed else "passed",
+        "status": "handoff" if fail_closed else "audit_failed",
         "reason": reason,
         "audited": False,
         "fail_closed": fail_closed,

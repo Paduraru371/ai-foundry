@@ -37,7 +37,19 @@ class Persona:
 
     # ---- the composition step: JSON -> the system prompt actually sent -------
     def system_prompt(self, *, grounded: bool) -> str:
-        parts = [self.instructions.strip()]
+        parts = [
+            self.instructions.strip(),
+            (
+                "Language rule: answer in the same language as the user's current "
+                "message. Preserve that language even when conversation history, "
+                "retrieved passages, or attached documents use another language."
+            ),
+            (
+                "Confidence metadata: end every substantive answer with one separate "
+                "line stating confidence as high, medium, or low. Localize both the "
+                "label and the value to the language of the user's current message."
+            ),
+        ]
 
         if self.policy:
             parts.append(

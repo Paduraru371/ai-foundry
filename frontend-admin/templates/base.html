@@ -1,13 +1,13 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" class="page-{{ active_page }}">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description" content="Libra Assist administration console">
   <title>{% block title %}Libra Assist{% endblock %} · Admin</title>
-  <link rel="stylesheet" href="{{ url_for('static', path='/styles.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', path='/styles.css') }}?v=20260804-chat-layout-12">
 </head>
-<body>
+<body class="page-{{ active_page }}">
   <div class="app-shell">
     {# Shared navigation; active_page is supplied by each FastAPI route. #}
     <aside class="sidebar">
@@ -55,8 +55,7 @@
           <button type="button" data-chat-topic="Verifică pe web dacă informațiile din răspunsul anterior sunt încă actuale."
             data-fact-check="true">Web fact-check tool</button>
           <button type="button" data-chat-topic="Analizează documentul atașat și oferă concluzii, riscuri și pașii următori.">Document analysis</button>
-          <button type="button" data-chat-topic="Răspunde scurt, apoi generează răspunsul și ca fișier audio."
-            data-delivery="speech">TTS delivery</button>
+          <button type="button" data-chat-topic="Răspunde scurt, apoi generează răspunsul și ca fișier audio.">TTS delivery</button>
         </section>
       {% endif %}
 

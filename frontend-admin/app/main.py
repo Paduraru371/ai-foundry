@@ -784,6 +784,40 @@ async def chat_message(
             active_chat_generations.pop(generation_id, None)
 
 
+@app.post("/chat/answer/speech")
+async def chat_answer_speech(answer: str = Form(min_length=1)) -> JSONResponse:
+    """Create speech on demand for an answer already shown in the conversation."""
+    try:
+        audio = await rag_api.speak(speech_text(answer))
+    except BackendError as exc:
+        return JSONResponse({"detail": exc.message}, status_code=exc.status_code or 502)
+    artifact_id = artifact_store.put(audio, "audio/wav", "libra-assist-answer.wav")
+    return JSONResponse({"artifact": {
+        "kind": "speech",
+        "url": f"/chat/artifacts/{artifact_id}",
+        "filename": "libra-assist-answer.wav",
+    }})
+
+
+@app.post("/chat/answer/document")
+async def chat_answer_document(
+    answer: str = Form(min_length=1),
+    document_type: str = Form(default="pdf"),
+) -> JSONResponse:
+    """Export an answer on demand in the document type selected below it."""
+    if document_type not in {"pdf", "docx", "pptx", "txt", "md", "json"}:
+        return JSONResponse({"detail": "Invalid document type."}, status_code=422)
+    generated = generate_document(document_type, answer)
+    artifact_id = artifact_store.put(
+        generated.content, generated.media_type, generated.filename,
+    )
+    return JSONResponse({"artifact": {
+        "kind": "document",
+        "url": f"/chat/artifacts/{artifact_id}",
+        "filename": generated.filename,
+    }})
+
+
 @app.post("/chat/generations/{generation_id}/cancel")
 async def chat_generation_cancel(generation_id: str) -> JSONResponse:
     task = active_chat_generations.get(generation_id)

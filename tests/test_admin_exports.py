@@ -55,12 +55,29 @@ class AdminDocumentExportTests(unittest.TestCase):
         self.assertIn('id="chat-source-dialog"', chat_template)
         self.assertIn('id="chat-source-format"', chat_template)
         self.assertIn('name="apply_response_format"', chat_template)
-        self.assertIn('name="apply_document_type"', chat_template)
-        self.assertIn('value="pptx"', chat_template)
-        self.assertIn("Generated file type", chat_template)
+        self.assertIn('class="chat-format-control"', chat_template)
+        self.assertIn('"chat-answer-tools"', chat_template)
+        self.assertIn('"/chat/answer/speech"', chat_template)
+        self.assertIn('"/chat/answer/document"', chat_template)
+        self.assertIn('["pptx", "PowerPoint"]', chat_template)
+        self.assertIn("Generate document", chat_template)
         self.assertIn("Content formatting", chat_template)
-        self.assertIn("Plain text file (.txt)", chat_template)
-        self.assertIn("Changing its value checks it automatically", chat_template)
+        self.assertIn('["txt", "Text"]', chat_template)
+        self.assertIn("Choose the response defaults", chat_template)
+        self.assertIn('id="toggle-left-panel"', chat_template)
+        self.assertIn('id="toggle-right-panel"', chat_template)
+        self.assertIn('id="chat-top-k"', chat_template)
+        self.assertIn('inputmode="numeric"', chat_template)
+        self.assertIn('window.matchMedia("(max-width: 1100px)")', chat_template)
+        self.assertNotIn('class="chat-setting-apply"', chat_template)
+        self.assertIn('name="apply_agent" type="hidden"', chat_template)
+        self.assertIn('"chat-left-hidden"', chat_template)
+        self.assertIn('"chat-right-hidden"', chat_template)
+        self.assertIn('"failed"', chat_template)
+        self.assertIn('!guardrailReason.startsWith("auditor_")', chat_template)
+        self.assertIn('Noti[țt]e|Note', chat_template)
+        self.assertIn('splitAnswerNotes(message.content).answer', chat_template)
+        self.assertIn("fallbackConfidence(message)", chat_template)
         self.assertIn("sessionReady = initializeSession()", chat_template)
         self.assertIn("localStorage.removeItem(sessionStorageKey)", chat_template)
         self.assertIn("async function openSource", chat_template)
@@ -86,6 +103,14 @@ class AdminDocumentExportTests(unittest.TestCase):
         )
         self.assertIn(
             "/chat/sources/{source}/download",
+            {route.path for route in app.routes},
+        )
+        self.assertIn(
+            "/chat/answer/speech",
+            {route.path for route in app.routes},
+        )
+        self.assertIn(
+            "/chat/answer/document",
             {route.path for route in app.routes},
         )
 

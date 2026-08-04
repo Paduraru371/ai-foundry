@@ -174,6 +174,7 @@ class GenerationOptionTests(unittest.TestCase):
         ))
 
         self.assertIn("CONVERSATION HISTORY", task)
+        self.assertIn("same language as the current question", task)
         self.assertIn("The database step is risky.", task)
         self.assertLess(
             task.index("CONVERSATION HISTORY"),

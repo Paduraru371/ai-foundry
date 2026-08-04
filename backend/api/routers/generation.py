@@ -143,7 +143,10 @@ def _analysis_task(
     req: AskRequest,
     context: PreparedContext | None = None,
 ) -> str:
-    parts: list[str] = []
+    parts: list[str] = [
+        "RESPONSE LANGUAGE:\nAnswer in the same language as the current question. "
+        "Do not switch languages because of history, sources, or attachments."
+    ]
     context = context or PreparedContext()
     history_turns = context.history or [
         {"role": turn.role, "content": turn.content}
