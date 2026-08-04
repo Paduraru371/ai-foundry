@@ -37,7 +37,7 @@ class Settings(BaseSettings):
     retrieval_max_per_source: int = 2
     grounding_guardrail_llm_enabled: bool = True
     grounding_guardrail_fail_closed: bool = False
-    grounding_guardrail_max_tokens: int = 900
+    grounding_guardrail_max_tokens: int = 1_800
     llm_temperature: float = 0.2
     llm_max_tokens: int = 2500   # reasoning models spend part of this budget thinking
     max_upload_bytes: int = 20 * 1024 * 1024

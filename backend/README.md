@@ -322,6 +322,8 @@ API keys are **not accepted** by the Agent Service — it is Entra-only. Set
 POST /tools/web-fetch    # a deliberately plain scraper — read its `warnings` array
 POST /tools/speak        # text → WAV (Azure AI Speech; needs AZURE_SPEECH_KEY/REGION)
 POST /tools/transcribe   # upload a WAV → text
+GET  /tools/catalog      # discover chat/onboarding tools and execution phases
+POST /tools/select       # preview the explainable multi-tool plan (no side effects)
 POST /documents/extract  # upload PDF/DOCX/PPTX/text → extracted text + token estimate
 ```
 

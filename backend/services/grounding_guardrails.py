@@ -44,11 +44,18 @@ Return JSON only:
   "action": "pass|rewrite|handoff|regulated_refusal|safety_refusal",
   "answer": "required only for rewrite",
   "reason": "short machine-readable reason",
-  "unsupported_claims": ["short descriptions"]
+ "unsupported_claims": ["short descriptions"]
 }
 
-For rewrite, preserve the user's language, requested structure and valid [n]
-citations. Remove unsupported claims instead of replacing them with guesses."""
+Keep reason under 12 words and unsupported_claims under 5 short items. Do not
+repeat the proposed answer unless action is rewrite. For rewrite, preserve the
+user's language, requested structure and valid [n] citations. Remove unsupported
+claims instead of replacing them with guesses."""
+
+AUDITOR_EXTRAS = {
+    "reasoning_effort": "minimal",
+    "response_format": {"type": "json_object"},
+}
 
 
 @dataclass
@@ -130,6 +137,7 @@ def review(
             user=user_prompt,
             temperature=0,
             max_tokens=settings.grounding_guardrail_max_tokens,
+            extras=AUDITOR_EXTRAS,
         )
     except Exception as error:
         return _audit_failure(
@@ -159,7 +167,8 @@ def review(
     reason = str(payload.get("reason") or action)
     unsupported = payload.get("unsupported_claims")
     details = {
-        "status": "passed" if action == "pass" else action,
+        "status": "passed" if action in {"pass", "rewrite"} else action,
+        "action": action,
         "reason": reason,
         "unsupported_claims": (
             [str(item) for item in unsupported[:10]]

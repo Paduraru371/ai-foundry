@@ -149,7 +149,7 @@ class LLM:
                 u, "completion_tokens_details", "reasoning_tokens"
             ),
         )
- 
+
     def describe(self) -> dict:
         return {"provider": self.provider, "model": self.model}
  

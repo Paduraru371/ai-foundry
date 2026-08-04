@@ -78,6 +78,9 @@ class RagApiClient:
     async def search(self, query: str, top_k: int) -> dict[str, Any]:
         return await self._request("POST", "/search", {"query": query, "top_k": top_k})
 
+    async def tool_catalog(self) -> dict[str, Any]:
+        return await self._request("GET", "/tools/catalog")
+
     async def source(self, source: str) -> dict[str, Any]:
         return await self._request(
             "GET",

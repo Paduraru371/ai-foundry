@@ -95,6 +95,15 @@ class AskRequest(BaseModel):
         True,
         description="Inject semantically relevant summaries from other sessions",
     )
+    tool_mode: Literal["auto", "none"] = Field(
+        "auto",
+        description="auto = select relevant tools; none = bypass tool selection",
+    )
+    requested_tools: list[str] = Field(
+        default_factory=list,
+        max_length=20,
+        description="Optional tool names to add to the automatic plan",
+    )
 
 
 class AgentInfo(BaseModel):
@@ -194,3 +203,5 @@ class AskResponse(BaseModel):
     guardrail: Optional[dict] = None
     session_id: Optional[str] = None
     memory: Optional[MemoryContextInfo] = None
+    tool_plan: Optional[dict] = None
+    tool_results: list[dict] = Field(default_factory=list)

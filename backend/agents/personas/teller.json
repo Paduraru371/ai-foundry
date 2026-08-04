@@ -13,5 +13,9 @@
   "reasoning_effort": "low",
   "require_citations": false,
   "refuse_when_unsupported": true,
-  "tools": []
+  "tools": [
+    "language_detector", "pii_safety_scan", "internal_knowledge_search",
+    "session_memory_search", "onboarding_intent_classifier", "onboarding_checklist",
+    "escalation_router", "speech_delivery"
+  ]
 }

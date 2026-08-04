@@ -40,6 +40,12 @@ from .rag import (
     SearchResponse,
     Strategy,
 )
+from .tooling import (
+    ToolCatalogItem,
+    ToolCatalogResponse,
+    ToolSelectionRequest,
+    ToolSelectionResponse,
+)
 
 __all__ = [
     "AgentInfo",
@@ -74,5 +80,9 @@ __all__ = [
     "SpeakRequest",
     "Strategy",
     "TranscribeResponse",
+    "ToolCatalogItem",
+    "ToolCatalogResponse",
+    "ToolSelectionRequest",
+    "ToolSelectionResponse",
     "Usage",
 ]

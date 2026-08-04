@@ -586,6 +586,69 @@ async def chat_source_download(source: str, format: str = "md") -> Response:
         return Response(exc.message, status_code=exc.status_code or 502)
 
 
+async def finalize_chat_result(
+    result: dict[str, Any],
+    *,
+    delivery: str,
+    document_type: str,
+    question: str,
+    extracted: dict[str, Any] | None,
+) -> dict[str, Any]:
+    artifacts = []
+    if delivery in {"speech", "speech_document"}:
+        audio = await rag_api.speak(speech_text(result["answer"]))
+        artifact_id = artifact_store.put(audio, "audio/wav", "libra-assist-answer.wav")
+        artifacts.append({
+            "kind": "speech", "url": f"/chat/artifacts/{artifact_id}",
+            "filename": "libra-assist-answer.wav",
+        })
+    if delivery in {"document", "speech_document"}:
+        generated = generate_document(
+            document_type,
+            result["answer"],
+            {
+                "question": question,
+                "agent": result.get("agent", {}).get("display_name"),
+                "model": result.get("model"),
+                "response_format": result.get("response_format"),
+            },
+        )
+        artifact_id = artifact_store.put(
+            generated.content, generated.media_type, generated.filename,
+        )
+        artifacts.append({
+            "kind": "document", "url": f"/chat/artifacts/{artifact_id}",
+            "filename": generated.filename,
+        })
+    artifact = artifacts[0] if artifacts else None
+    return {
+        "answer": result["answer"],
+        "agent": result.get("agent"),
+        "provider": result.get("provider"),
+        "model": result.get("model"),
+        "usage": result.get("usage"),
+        "fact_check": result.get("fact_check"),
+        "guardrail": result.get("guardrail"),
+        "augmented": result.get("augmented", False),
+        "sources": result.get("retrieved", []),
+        "response_format": result.get("response_format"),
+        "attachment": (
+            {
+                "filename": extracted["filename"],
+                "characters": extracted["characters"],
+                "estimated_tokens": extracted["estimated_tokens"],
+            }
+            if extracted else None
+        ),
+        "artifact": artifact,
+        "artifacts": artifacts,
+        "session_id": result.get("session_id"),
+        "memory": result.get("memory"),
+        "tool_plan": result.get("tool_plan"),
+        "tool_results": result.get("tool_results", []),
+    }
+
+
 @app.post("/chat/message")
 async def chat_message(
     message: str = Form(min_length=1),
@@ -685,88 +748,35 @@ async def chat_message(
             )
 
     generation_id = generation_id or uuid4().hex
+    ask_arguments = (
+        message.strip(), use_rag, top_k_value, agent_value, agent_mode_value,
+        fact_check, response_format,
+        extracted["text"] if extracted else None,
+        extracted["filename"] if extracted else None,
+        safe_history,
+    )
+    ask_keywords = {
+        "session_id": session_id,
+        "shared_memory": shared_memory,
+        "document_path": extracted.get("saved_path") if extracted else None,
+        "generation_id": generation_id,
+        "delivery": delivery,
+        "document_type": document_type,
+    }
+
     generation_task = asyncio.create_task(
-        rag_api.ask(
-            message.strip(),
-            use_rag,
-            top_k_value,
-            agent_value,
-            agent_mode_value,
-            fact_check,
-            response_format,
-            extracted["text"] if extracted else None,
-            extracted["filename"] if extracted else None,
-            safe_history,
-            session_id=session_id,
-            shared_memory=shared_memory,
-            document_path=extracted.get("saved_path") if extracted else None,
-            generation_id=generation_id,
-            delivery=delivery,
-            document_type=document_type,
-        )
+        rag_api.ask(*ask_arguments, **ask_keywords)
     )
     active_chat_generations[generation_id] = generation_task
     try:
         result = await generation_task
-        artifacts = []
-        if delivery in {"speech", "speech_document"}:
-            audio = await rag_api.speak(speech_text(result["answer"]))
-            artifact_id = artifact_store.put(
-                audio,
-                "audio/wav",
-                "libra-assist-answer.wav",
-            )
-            artifacts.append({
-                "kind": "speech",
-                "url": f"/chat/artifacts/{artifact_id}",
-                "filename": "libra-assist-answer.wav",
-            })
-        if delivery in {"document", "speech_document"}:
-            generated = generate_document(
-                document_type,
-                result["answer"],
-                {
-                    "question": message.strip(),
-                    "agent": result.get("agent", {}).get("display_name"),
-                    "model": result.get("model"),
-                    "response_format": result.get("response_format"),
-                },
-            )
-            artifact_id = artifact_store.put(
-                generated.content,
-                generated.media_type,
-                generated.filename,
-            )
-            artifacts.append({
-                "kind": "document",
-                "url": f"/chat/artifacts/{artifact_id}",
-                "filename": generated.filename,
-            })
-        artifact = artifacts[0] if artifacts else None
-        return JSONResponse({
-            "answer": result["answer"],
-            "agent": result.get("agent"),
-            "provider": result.get("provider"),
-            "model": result.get("model"),
-            "usage": result.get("usage"),
-            "fact_check": result.get("fact_check"),
-            "guardrail": result.get("guardrail"),
-            "augmented": result.get("augmented", False),
-            "sources": result.get("retrieved", []),
-            "response_format": result.get("response_format"),
-            "attachment": (
-                {
-                    "filename": extracted["filename"],
-                    "characters": extracted["characters"],
-                    "estimated_tokens": extracted["estimated_tokens"],
-                }
-                if extracted else None
-            ),
-            "artifact": artifact,
-            "artifacts": artifacts,
-            "session_id": result.get("session_id"),
-            "memory": result.get("memory"),
-        })
+        return JSONResponse(await finalize_chat_result(
+            result,
+            delivery=delivery,
+            document_type=document_type,
+            question=message.strip(),
+            extracted=extracted,
+        ))
     except asyncio.CancelledError:
         return JSONResponse(
             {"detail": "Generation cancelled by the user.", "cancelled": True},
@@ -927,16 +937,30 @@ async def delete_hosted_agent(
 
 
 # Tools
+async def render_tools_page(
+    request: Request,
+    **context: Any,
+) -> HTMLResponse:
+    values: dict[str, Any] = {
+        "active_page": "tools",
+        "url": "https://example.com",
+        "max_chars": 20000,
+        "speech_text": "Your card was blocked after three failed PIN attempts.",
+        "tool_catalog": [],
+        "catalog_error": None,
+    }
+    values.update(context)
+    try:
+        catalog = await rag_api.tool_catalog()
+        values["tool_catalog"] = catalog.get("tools", [])
+    except BackendError as exc:
+        values["catalog_error"] = exc.message
+    return render(request, "tools.html", **values)
+
+
 @app.get("/tools", response_class=HTMLResponse)
 async def tools_page(request: Request) -> HTMLResponse:
-    return render(
-        request,
-        "tools.html",
-        active_page="tools",
-        url="https://example.com",
-        max_chars=20000,
-        speech_text="Your card was blocked after three failed PIN attempts.",
-    )
+    return await render_tools_page(request)
 
 
 @app.post("/tools/web-fetch", response_class=HTMLResponse)
@@ -947,23 +971,17 @@ async def web_fetch(
 ) -> HTMLResponse:
     try:
         result = await rag_api.web_fetch(url.strip(), max_chars)
-        return render(
+        return await render_tools_page(
             request,
-            "tools.html",
-            active_page="tools",
             url=url,
             max_chars=max_chars,
-            speech_text="Your card was blocked after three failed PIN attempts.",
             web_result=result,
         )
     except BackendError as exc:
-        return render(
+        return await render_tools_page(
             request,
-            "tools.html",
-            active_page="tools",
             url=url,
             max_chars=max_chars,
-            speech_text="Your card was blocked after three failed PIN attempts.",
             **error_context(exc),
         )
 
@@ -992,23 +1010,13 @@ async def transcribe(request: Request, file: UploadFile = File(...)) -> HTMLResp
             content,
             file.content_type or "audio/wav",
         )
-        return render(
+        return await render_tools_page(
             request,
-            "tools.html",
-            active_page="tools",
-            url="https://example.com",
-            max_chars=20000,
-            speech_text="Your card was blocked after three failed PIN attempts.",
             transcript=result,
         )
     except BackendError as exc:
-        return render(
+        return await render_tools_page(
             request,
-            "tools.html",
-            active_page="tools",
-            url="https://example.com",
-            max_chars=20000,
-            speech_text="Your card was blocked after three failed PIN attempts.",
             **error_context(exc),
         )
 

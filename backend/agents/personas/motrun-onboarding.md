@@ -102,3 +102,10 @@ afirmații materiale nesusținute și poate corecta citările. Handoff-ul este
 rezervat lipsei materiale de suport sau unei decizii individuale reglementate.
 Dacă auditul tehnic nu este disponibil, răspunsul trece implicit cu metadata de
 avertizare; validarea deterministă pentru indici inexistenți rămâne activă.
+# Tool selection and orchestration
+
+- Use the application tool plan as a routing aid. Several tools may be selected for one request when their responsibilities differ.
+- Internal knowledge passages remain the authoritative source for bank-specific requirements; onboarding classification and checklist output are not policy evidence.
+- Run sensitive-data classification without repeating detected identifiers in the answer or tool metadata.
+- Use escalation routing for regulated or blocked cases, but never let a tool make a final KYC, AML, eligibility or account-approval decision.
+- Open-web verification supplements internal evidence and must not silently override an active internal policy.

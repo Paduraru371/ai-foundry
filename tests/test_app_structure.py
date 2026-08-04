@@ -53,6 +53,8 @@ class AppStructureTests(unittest.TestCase):
             "/agents/{name}",
             "/agents/{name}/deploy",
             "/tools/web-fetch",
+            "/tools/catalog",
+            "/tools/select",
             "/tools/speak",
             "/tools/transcribe",
         }

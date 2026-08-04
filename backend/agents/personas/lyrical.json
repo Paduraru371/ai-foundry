@@ -13,5 +13,5 @@
   "reasoning_effort": "low",
   "require_citations": true,
   "refuse_when_unsupported": true,
-  "tools": []
+  "tools": ["language_detector", "pii_safety_scan", "internal_knowledge_search"]
 }

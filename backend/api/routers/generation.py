@@ -25,6 +25,8 @@ from ...services.generation_control import (
     GenerationCancelled,
     generation_control,
 )
+from ...tooling import ToolPlan, default_catalog, default_orchestrator
+from ...tooling.selector import SelectionContext
 from ..dependencies import require_qdrant, retrieve, store
 
 router = APIRouter()
@@ -142,12 +144,15 @@ def _apply_grounding_guardrail(
 def _analysis_task(
     req: AskRequest,
     context: PreparedContext | None = None,
+    tool_context: str = "",
 ) -> str:
     parts: list[str] = [
         "RESPONSE LANGUAGE:\nAnswer in the same language as the current question. "
         "Do not switch languages because of history, sources, or attachments."
     ]
     context = context or PreparedContext()
+    if tool_context:
+        parts.append(tool_context)
     history_turns = context.history or [
         {"role": turn.role, "content": turn.content}
         for turn in req.history
@@ -252,7 +257,6 @@ def _run_generation(req: AskRequest, cancellation=None) -> AskResponse:
     except ValueError as error:
         raise HTTPException(status_code=404, detail=str(error))
     generation_control.checkpoint(cancellation)
-    task = _analysis_task(req, context)
     persona = None
     hosted_only = None
     try:
@@ -266,6 +270,42 @@ def _run_generation(req: AskRequest, cancellation=None) -> AskResponse:
             raise HTTPException(status_code=503, detail=str(foundry_error))
         if not hosted_only:
             raise HTTPException(status_code=404, detail=str(error))
+
+    if req.tool_mode == "auto":
+        unknown_tools = sorted(set(req.requested_tools) - set(default_catalog.names()))
+        if unknown_tools:
+            raise HTTPException(
+                status_code=422,
+                detail=f"Unknown requested tools: {', '.join(unknown_tools)}",
+            )
+        if persona is not None and persona.tools:
+            disallowed_tools = sorted(set(req.requested_tools) - set(persona.tools))
+            if disallowed_tools:
+                raise HTTPException(
+                    status_code=422,
+                    detail=(
+                        f"Tools not allowed for persona '{persona.name}': "
+                        + ", ".join(disallowed_tools)
+                    ),
+                )
+        tool_plan = default_orchestrator.plan(SelectionContext(
+            question=req.question,
+            use_rag=req.use_rag,
+            shared_memory=req.shared_memory,
+            has_attachment=bool(req.document_text or req.document_path),
+            fact_check=req.fact_check,
+            delivery=req.delivery,
+            requested_tools=req.requested_tools,
+            allowed_tools=persona.tools if persona is not None else [],
+        ))
+    else:
+        tool_plan = ToolPlan(selector="disabled")
+    tool_results = default_orchestrator.execute(tool_plan, req.question)
+    task = _analysis_task(
+        req,
+        context,
+        default_orchestrator.prompt_context(tool_results),
+    )
 
     generation_control.checkpoint(cancellation)
     if req.use_rag:
@@ -369,6 +409,8 @@ def _run_generation(req: AskRequest, cancellation=None) -> AskResponse:
                             "reason": "no_relevant_context",
                         },
                         "memory": memory_info.model_dump(),
+                        "tool_plan": tool_plan.as_dict(),
+                        "tool_results": [result.as_dict() for result in tool_results],
                     },
                 )
             return AskResponse(
@@ -389,6 +431,8 @@ def _run_generation(req: AskRequest, cancellation=None) -> AskResponse:
                 },
                 session_id=req.session_id,
                 memory=memory_info,
+                tool_plan=tool_plan.as_dict(),
+                tool_results=[result.as_dict() for result in tool_results],
             )
 
     chunks = [hit.model_dump() for hit in retrieved]
@@ -535,6 +579,8 @@ def _run_generation(req: AskRequest, cancellation=None) -> AskResponse:
                 "augmented": req.use_rag,
                 "sources": [hit.model_dump() for hit in retrieved],
                 "memory": memory_info.model_dump(),
+                "tool_plan": tool_plan.as_dict(),
+                "tool_results": [result.as_dict() for result in tool_results],
             },
         )
     return AskResponse(
@@ -553,6 +599,8 @@ def _run_generation(req: AskRequest, cancellation=None) -> AskResponse:
         guardrail=guardrail,
         session_id=req.session_id,
         memory=memory_info,
+        tool_plan=tool_plan.as_dict(),
+        tool_results=[result.as_dict() for result in tool_results],
     )
 
 

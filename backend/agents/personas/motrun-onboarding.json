@@ -38,5 +38,19 @@
   "require_citations": true,
   "refuse_when_unsupported": true,
   "unsupported_response": "If the passages do not support a reliable answer, do not say I do not know, not found or not available. Do not invent an answer or contact details. Briefly say that the case needs confirmation, then direct the user to the appropriate human bank team or a branch. Provide a telephone number only if it appears in an official retrieved source.",
-  "tools": []
+  "tools": [
+    "language_detector",
+    "pii_safety_scan",
+    "internal_knowledge_search",
+    "session_memory_search",
+    "attachment_analysis",
+    "onboarding_intent_classifier",
+    "onboarding_checklist",
+    "escalation_router",
+    "safe_calculator",
+    "web_fact_check",
+    "web_fetch",
+    "speech_delivery",
+    "document_export"
+  ]
 }

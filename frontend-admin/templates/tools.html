@@ -5,9 +5,49 @@
     <div>
       <span class="eyebrow">Specialist services</span>
       <h1>Tools</h1>
-      <p>Exercise the web extraction and Azure Speech capabilities exposed by the backend.</p>
+      <p>Discover the chatbot and onboarding capabilities, then exercise the interactive backend services.</p>
     </div>
   </header>
+
+  <section class="panel tool-catalog-panel">
+    <header class="panel-header">
+      <div>
+        <span class="eyebrow">GET /tools/catalog</span>
+        <h2>Available capabilities</h2>
+        <p>Tools are selected automatically per request and can be combined when several capabilities are needed.</p>
+      </div>
+      {% if tool_catalog %}<span class="model-badge">{{ tool_catalog | length }} tools</span>{% endif %}
+    </header>
+
+    {% if catalog_error %}
+      <div class="inline-error">{{ catalog_error }}</div>
+    {% elif tool_catalog %}
+      <div class="tool-catalog-grid">
+        {% for tool in tool_catalog %}
+          <article class="tool-catalog-card">
+            <div class="tool-card-heading">
+              <span class="tool-card-icon" aria-hidden="true">{{ tool.title[0] }}</span>
+              <div>
+                <span class="eyebrow">{{ tool.category }}</span>
+                <h3>{{ tool.title }}</h3>
+              </div>
+            </div>
+            <p>{{ tool.description }}</p>
+            <div class="badge-row">
+              <span class="status-pill">{{ tool.phase }}</span>
+              <span class="status-pill {{ 'ok' if tool.execution == 'local' else '' }}">{{ tool.execution }}</span>
+              <span class="status-pill {{ 'ok' if tool.automatic else '' }}">
+                {{ 'automatic' if tool.automatic else 'on request' }}
+              </span>
+            </div>
+            <code>{{ tool.name }}</code>
+          </article>
+        {% endfor %}
+      </div>
+    {% else %}
+      <p class="empty-state">No tools are currently registered.</p>
+    {% endif %}
+  </section>
 
   <section class="panel">
     <header class="panel-header">

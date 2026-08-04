@@ -437,6 +437,16 @@
               + (message.memory.compaction ? ` · compaction ${message.memory.compaction}` : ""),
             ));
           }
+          if (message.role === "assistant" && message.toolPlan?.calls?.length) {
+            const selectedTools = message.toolPlan.calls
+              .map((call) => call.name.replaceAll("_", " "))
+              .join(" · ");
+            card.append(element(
+              "div",
+              "chat-message-meta",
+              `Tools: ${selectedTools}`,
+            ));
+          }
           if (message.factCheck) {
             card.append(element(
               "div",
@@ -452,6 +462,8 @@
               "div",
               `chat-guardrail ${guardrailPassed ? "passed" : "failed"}`,
               `Grounding guardrail: ${guardrailPassed ? "passed" : "not passed"}`
+              + (guardrailPassed && message.guardrail.action === "rewrite"
+                ? " · corrected by auditor" : "")
               + (!guardrailPassed && message.guardrail.status
                 ? ` · ${message.guardrail.status.replaceAll("_", " ")}` : "")
               + (guardrailReason ? ` · ${guardrailReason.replaceAll("_", " ")}` : ""),
@@ -784,6 +796,8 @@
             artifact: result.artifact,
             artifacts: result.artifacts || (result.artifact ? [result.artifact] : []),
             memory: result.memory,
+            toolPlan: result.tool_plan,
+            toolResults: result.tool_results || [],
           });
           const artifactKinds = new Set(
             (result.artifacts || (result.artifact ? [result.artifact] : []))
@@ -847,6 +861,8 @@
             saved_session: true,
             shared_sessions_used: 0,
           },
+          toolPlan: metadata.tool_plan,
+          toolResults: metadata.tool_results || [],
         };
       }
 

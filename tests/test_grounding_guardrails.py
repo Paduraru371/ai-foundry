@@ -35,6 +35,16 @@ class _FakeLLM:
         )
 
 
+class _CapturingLLM(_FakeLLM):
+    def __init__(self, text: str) -> None:
+        super().__init__(text)
+        self.kwargs = {}
+
+    def chat(self, **kwargs) -> ChatResult:
+        self.kwargs = kwargs
+        return super().chat(**kwargs)
+
+
 class GroundingGuardrailTests(unittest.TestCase):
     def _review(self, payload: str):
         with patch.object(
@@ -59,6 +69,24 @@ class GroundingGuardrailTests(unittest.TestCase):
         self.assertTrue(review.details["audited"])
         self.assertIsNotNone(review.result)
 
+    def test_auditor_forces_compact_json_with_minimal_reasoning(self) -> None:
+        llm = _CapturingLLM(
+            '{"action":"pass","reason":"entailed","unsupported_claims":[]}'
+        )
+        with patch.object(grounding_guardrails, "get_llm", return_value=llm):
+            grounding_guardrails.review(
+                "Care sunt documentele?",
+                "Este necesar actul de identitate. [1]",
+                CHUNKS,
+                HANDOFF,
+            )
+
+        self.assertEqual(llm.kwargs["extras"]["reasoning_effort"], "minimal")
+        self.assertEqual(
+            llm.kwargs["extras"]["response_format"],
+            {"type": "json_object"},
+        )
+
     def test_valid_rewrite_replaces_only_the_answer(self) -> None:
         review = self._review(
             '{"action":"rewrite","answer":"- Act de identitate. [1]",'
@@ -66,7 +94,8 @@ class GroundingGuardrailTests(unittest.TestCase):
         )
 
         self.assertEqual(review.answer, "- Act de identitate. [1]")
-        self.assertEqual(review.details["status"], "rewrite")
+        self.assertEqual(review.details["status"], "passed")
+        self.assertEqual(review.details["action"], "rewrite")
         self.assertEqual(review.details["unsupported_claims"], ["taxă"])
 
     def test_invalid_rewrite_preserves_answer_when_fail_open(self) -> None:

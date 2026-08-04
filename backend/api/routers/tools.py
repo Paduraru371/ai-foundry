@@ -9,10 +9,32 @@ from ...schemas import (
     ScrapeResponse,
     SpeakRequest,
     TranscribeResponse,
+    ToolCatalogResponse,
+    ToolSelectionRequest,
+    ToolSelectionResponse,
 )
 from ...services import speech, web
+from ...tooling import default_catalog, default_orchestrator
+from ...tooling.selector import SelectionContext
 
 router = APIRouter()
+
+
+@router.get("/tools/catalog", response_model=ToolCatalogResponse, tags=["6 · tools"])
+def tool_catalog() -> ToolCatalogResponse:
+    """List selectable chatbot and onboarding capabilities."""
+    tools = default_catalog.as_dicts()
+    return ToolCatalogResponse(count=len(tools), tools=tools)
+
+
+@router.post("/tools/select", response_model=ToolSelectionResponse, tags=["6 · tools"])
+def select_tools(req: ToolSelectionRequest) -> ToolSelectionResponse:
+    """Return an explainable tool plan without performing external actions."""
+    unknown = sorted(set(req.requested_tools + req.allowed_tools) - set(default_catalog.names()))
+    if unknown:
+        raise HTTPException(status_code=422, detail=f"Unknown tools: {', '.join(unknown)}")
+    plan = default_orchestrator.plan(SelectionContext(**req.model_dump()))
+    return ToolSelectionResponse(**plan.as_dict())
 
 
 @router.post("/tools/web-fetch", response_model=ScrapeResponse, tags=["6 · tools"])

@@ -68,6 +68,7 @@ backend/
 | `documents.py` | extragerea textului din upload-uri |
 | `agents.py` | personas locale și agenți Foundry |
 | `tools.py` | speech, transcriere și web fetch |
+| `tooling/` | catalog, selector multi-tool, execuții locale sigure și orchestrare |
 | `azure.py` | status și integrare Azure |
 
 Documentația interactivă este disponibilă la:
@@ -180,6 +181,7 @@ Reranker-ul LLM:
 
 Endpoint-ul principal este `POST /ask`.
 
+
 Flow:
 
 1. validează request-ul;
@@ -289,6 +291,10 @@ Acțiuni:
 - `regulated_refusal`
 - `safety_refusal`
 
+A successful `rewrite` is exposed as `status=passed` and `action=rewrite`, because
+the final corrected answer has passed citation validation. An invalid rewrite
+remains `audit_failed`.
+
 O rescriere este acceptată numai dacă păstrează citări valide. Configurația
 implicită este:
 
@@ -348,6 +354,29 @@ ca anulat. Backend-ul verifică starea la limitele importante:
 Persistarea este commit boundary: un răspuns anulat nu intră în sesiune.
 
 ## 12. Documente, speech și fact-check
+
+### Tool selector și selecție multiplă
+
+`backend/tooling/` separă patru responsabilități: catalogul capabilităților,
+regulile de selecție, execuțiile locale deterministe și orchestrarea. La fiecare
+`POST /ask`, modul implicit `tool_mode=auto` construiește un plan explicabil,
+filtrat prin lista `tools` a personei. Câmpul opțional `requested_tools` poate
+adăuga explicit un tool permis; `tool_mode=none` dezactivează selecția.
+
+O singură cerere poate selecta mai multe capabilități. De exemplu, o întrebare
+despre actele unei companii poate activa detectarea limbii, scanarea PII,
+căutarea internă, memoria, clasificarea intenției și checklist-ul de onboarding.
+Rezultatul expune `tool_plan` și `tool_results`, inclusiv motivul selecției și
+starea `completed`, `delegated`, `skipped` sau `error`.
+
+Tool-urile `local` nu produc efecte externe. Tool-urile `pipeline` marchează
+etapele deja implementate de aplicație (RAG, memorie, fact-check, speech și
+export document), astfel încât acestea să nu fie duplicate. Checklist-ul este
+doar un indiciu de rutare: cerințele exacte trebuie susținute de documentele
+interne, iar deciziile finale KYC/AML rămân la echipele autorizate.
+
+Catalogul poate fi inspectat prin `GET /tools/catalog`, iar selecția poate fi
+testată fără execuție sau efecte externe prin `POST /tools/select`.
 
 Extragere acceptată:
 
